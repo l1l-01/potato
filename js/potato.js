@@ -13,7 +13,6 @@ const ACTIONS = {
   GET: "ACTION",
   UPD: "ACTION",
   DLT: "ACTION",
-  PUT: "ACTION",
   DROP: "ACTION",
 };
 
@@ -53,6 +52,8 @@ const ERROR_TYPES = {
   CRUD_OPERATIONS:
     "Error(002): Only one CRUD operation can run at a time. You are trying to use more than one: ",
   CRUD_KEYWORD_MISPLACED: "ERROR(003): Misplaced CRUD keyword: ",
+  CRUD_MULTIPLE_TABLES:
+    "ERROR(003): You can only perform one CRUD operation on a single table at a time: ",
 };
 
 function lexer(VALUE) {
@@ -129,7 +130,7 @@ export function parser(VALUE) {
   };
 
   //* Catch missing CRUD operator && Detect multiple CRUD operations used simultaneously
-  const actions =
+  const ACTIONS =
     TOKENS.filter(
       (token) =>
         token.value == "LET" ||
@@ -139,42 +140,83 @@ export function parser(VALUE) {
         token.value == "DROP",
     ) || null;
 
-  const ACTIONS_LENGTH = actions.length;
+  const ACTIONS_LENGTH = ACTIONS.length;
 
   if (ACTIONS_LENGTH == 0) {
     errors.push(ERROR_TYPES.CRUD_KEYWORD);
-    return errors;
   } else if (ACTIONS_LENGTH >= 2) {
     let operations = "";
-    actions.forEach((action, i) => {
+    ACTIONS.forEach((action, i) => {
       operations += `${action.value} at position ${action.position}${ACTIONS_LENGTH == i + 1 ? "." : ", "}`;
     });
     const ERROR = ERROR_TYPES.CRUD_OPERATIONS + operations;
     errors.push(ERROR);
+  }
+
+  //* Catching a CRUD operation on more than one table
+  const TABLES = TOKENS.filter((token) => token.type == "TABLE");
+  const TABLES_LENGTH = TABLES.length;
+
+  if (TABLES_LENGTH > 1) {
+    let tables = "";
+    TABLES.forEach((action, i) => {
+      tables += `${action.value} at position ${action.position}${ACTIONS_LENGTH == i + 1 ? ", " : "."}`;
+    });
+    const ERROR = `${ERROR_TYPES.CRUD_MULTIPLE_TABLES}` + tables;
+    errors.push(ERROR);
+  }
+
+  if (errors.length > 0) {
+    console.log(errors);
     return errors;
   }
 
   TOKENS.forEach((token, i) => {
     if (token.type != "TABLE") {
-      for (let keyword in KEYWORDS) {
-        if (token.type == "KEYWORD" && keyword == token.value) {
-          console.log("Keyword: ", keyword, token.type, i);
-        }
-      }
+      switch (token.type) {
+        case "FIELD":
+          console.log("Field: ", token.value, token.type, i);
+          break;
+        case "VALUE":
+          console.log("value: ", token.value, token.type, i);
+          break;
+        case "IDENTIFICATION":
+          console.log("Id: ", token.value, token.type, i);
+          break;
+        case "LIMITAION":
+          console.log("Limit: ", token.value, token.type, i);
+          break;
 
-      for (let keyword in DATATYPES) {
-        if (token.type == "DATATYPE" && keyword == token.value) {
-          console.log("Datatype", keyword, token.type, i);
-        }
-      }
+        default:
+          for (let keyword in KEYWORDS) {
+            if (token.type == "KEYWORD" && keyword == token.value) {
+              console.log("Keyword: ", keyword, token.type, i);
+            }
+          }
 
-      for (let keyword in OPERATORS) {
-        if (token.type == "OPERATOR" && keyword == token.value) {
-          console.log("Operator", keyword, token.type, i);
-        }
+          for (let keyword in DATATYPES) {
+            if (token.type == "DATATYPE" && keyword == token.value) {
+              console.log("Datatype", keyword, token.type, i);
+            }
+          }
+
+          for (let keyword in OPERATORS) {
+            if (token.type == "OPERATOR" && keyword == token.value) {
+              console.log("Operator", keyword, token.type, i);
+            }
+          }
+          break;
       }
     } else {
-      //* Get table name and fields names
+      console.log("TABLE", token.type, token.value, i);
+    }
+  });
+
+  /*
+  const error = `Error: The OPERATOR ${token.value} was written wrong at the position ${token.position}, It should be writen like ${keyword}`;
+  errors.push(error);
+
+  //* Get table name and fields names
       const TOKEN_VALUE = TOKENS[i - 1]?.value;
       if (TOKEN_VALUE != undefined) {
         if (
@@ -193,13 +235,6 @@ export function parser(VALUE) {
         const ERROR = `${ERROR_TYPES.CRUD_KEYWORD_MISPLACED} ${actions[0].value} at position ${actions[0].position}.`;
         errors.push(ERROR);
       }
-      console.log("TABLE", token.type, token.value, i);
-    }
-  });
-
-  /*
-  const error = `Error: The OPERATOR ${token.value} was written wrong at the position ${token.position}, It should be writen like ${keyword}`;
-  errors.push(error);
   */
-  console.log(atsNode, errors, fields);
+  //console.log(atsNode, errors, fields);
 }
