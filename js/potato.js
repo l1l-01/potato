@@ -54,6 +54,8 @@ const ERROR_TYPES = {
   CRUD_KEYWORD_MISPLACED: "ERROR(003): Misplaced CRUD keyword: ",
   CRUD_MULTIPLE_TABLES:
     "ERROR(003): You can only perform one CRUD operation on a single table at a time: ",
+  MISSING_TABLE: "ERROR(004): Your query is missing a table name.",
+  MISPLACED_TABLE_NAME: "ERROR(004): Misplaced table name: ",
 };
 
 function lexer(VALUE) {
@@ -119,6 +121,7 @@ function lexer(VALUE) {
 
 export function parser(VALUE) {
   const TOKENS = lexer(VALUE);
+  let error = "";
   let errors = [];
   let fields = [];
   let values = [];
@@ -149,21 +152,23 @@ export function parser(VALUE) {
     ACTIONS.forEach((action, i) => {
       operations += `${action.value} at position ${action.position}${ACTIONS_LENGTH == i + 1 ? "." : ", "}`;
     });
-    const ERROR = ERROR_TYPES.CRUD_OPERATIONS + operations;
-    errors.push(ERROR);
+    error = ERROR_TYPES.CRUD_OPERATIONS + operations;
+    errors.push(error);
   }
 
-  //* Catching a CRUD operation on more than one table
+  //* Catching a CRUD operation on more than one table && Missing table name
   const TABLES = TOKENS.filter((token) => token.type == "TABLE");
   const TABLES_LENGTH = TABLES.length;
 
-  if (TABLES_LENGTH > 1) {
+  if (TABLES_LENGTH == 0) {
+    errors.push(ERROR_TYPES.MISSING_TABLE);
+  } else if (TABLES_LENGTH > 1) {
     let tables = "";
     TABLES.forEach((action, i) => {
       tables += `${action.value} at position ${action.position}${ACTIONS_LENGTH == i + 1 ? ", " : "."}`;
     });
-    const ERROR = `${ERROR_TYPES.CRUD_MULTIPLE_TABLES}` + tables;
-    errors.push(ERROR);
+    error = `${ERROR_TYPES.CRUD_MULTIPLE_TABLES}` + tables;
+    errors.push(error);
   }
 
   if (errors.length > 0) {
@@ -176,9 +181,11 @@ export function parser(VALUE) {
       switch (token.type) {
         case "FIELD":
           console.log("Field: ", token.value, token.type, i);
+          fields.push([token.value, token.position]);
           break;
         case "VALUE":
           console.log("value: ", token.value, token.type, i);
+          values.push([token.value, token.position]);
           break;
         case "IDENTIFICATION":
           console.log("Id: ", token.value, token.type, i);
@@ -208,9 +215,19 @@ export function parser(VALUE) {
           break;
       }
     } else {
+      // Catching a misplaced table
+      if (TOKENS[i - 1].type != "ACTION") {
+        error = `${ERROR_TYPES.MISPLACED_TABLE_NAME} at position ${token.position}.`;
+        errors.push(error);
+      }
       console.log("TABLE", token.type, token.value, i);
     }
   });
+
+  if (errors.length > 0) {
+    console.log(errors);
+    return errors;
+  }
 
   /*
   const error = `Error: The OPERATOR ${token.value} was written wrong at the position ${token.position}, It should be writen like ${keyword}`;
