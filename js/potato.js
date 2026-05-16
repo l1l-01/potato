@@ -121,13 +121,19 @@ function lexer(VALUE) {
 
 export function parser(VALUE) {
   const TOKENS = lexer(VALUE);
+
   let error = "";
   let errors = [];
   let fields = [];
+  let ids = [];
+  let limits = [];
   let values = [];
+  let keywords = [];
+  let datatypes = [];
+  let operators = [];
+
   const atsNode = {
     action: "",
-    type: "",
     table: "",
     column: [],
   };
@@ -181,42 +187,56 @@ export function parser(VALUE) {
       switch (token.type) {
         case "FIELD":
           console.log("Field: ", token.value, token.type, i);
-          fields.push([token.value, token.position]);
+          fields.push(token.value);
           break;
         case "VALUE":
           console.log("value: ", token.value, token.type, i);
-          values.push([token.value, token.position]);
+          values.push(token.value);
           break;
         case "IDENTIFICATION":
           console.log("Id: ", token.value, token.type, i);
+          ids.push(token.value);
           break;
         case "LIMITAION":
           console.log("Limit: ", token.value, token.type, i);
+          limits.push(token.value);
+          break;
+
+        case "ACTION":
+          // Catching a misplaced table
+          if (i != 0) {
+            error = `${ERROR_TYPES.CRUD_KEYWORD_MISPLACED} ${token.value} at position ${token.position}, CRUD keyword must be the first word in the query."`;
+            errors.push(error);
+          } else {
+            atsNode.action = "create";
+          }
           break;
 
         default:
           for (let keyword in KEYWORDS) {
             if (token.type == "KEYWORD" && keyword == token.value) {
               console.log("Keyword: ", keyword, token.type, i);
+              keywords.push(token.value);
             }
           }
 
           for (let keyword in DATATYPES) {
             if (token.type == "DATATYPE" && keyword == token.value) {
               console.log("Datatype", keyword, token.type, i);
+              datatypes.push(token.type);
             }
           }
 
           for (let keyword in OPERATORS) {
             if (token.type == "OPERATOR" && keyword == token.value) {
               console.log("Operator", keyword, token.type, i);
+              operators.push(token.type);
             }
           }
           break;
       }
     } else {
-      // Catching a misplaced table
-      if (TOKENS[i - 1].type != "ACTION") {
+      if (TOKENS[i - 1]?.type != "ACTION") {
         error = `${ERROR_TYPES.MISPLACED_TABLE_NAME} at position ${token.position}.`;
         errors.push(error);
       }
@@ -229,29 +249,7 @@ export function parser(VALUE) {
     return errors;
   }
 
-  /*
-  const error = `Error: The OPERATOR ${token.value} was written wrong at the position ${token.position}, It should be writen like ${keyword}`;
-  errors.push(error);
+  console.log(fields, values);
 
-  //* Get table name and fields names
-      const TOKEN_VALUE = TOKENS[i - 1]?.value;
-      if (TOKEN_VALUE != undefined) {
-        if (
-          TOKEN_VALUE == "LET" ||
-          TOKEN_VALUE == "GET" ||
-          TOKEN_VALUE == "UPD" ||
-          TOKEN_VALUE == "DLT" ||
-          TOKEN_VALUE == "DROP"
-        ) {
-          console.log("Table Name: ", token.value, i);
-          atsNode.table = token.value;
-        } else {
-          fields.push({ field: token.value, filed_position: token.position });
-        }
-      } else {
-        const ERROR = `${ERROR_TYPES.CRUD_KEYWORD_MISPLACED} ${actions[0].value} at position ${actions[0].position}.`;
-        errors.push(ERROR);
-      }
-  */
   //console.log(atsNode, errors, fields);
 }
