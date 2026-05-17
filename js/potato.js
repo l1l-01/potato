@@ -33,9 +33,9 @@ const PREFIXES = {
 };
 
 const FUNCTIONS = {
-  SUM: "KEYWORD",
-  AVG: "KEYWORD",
-  COUNT: "KEYWORD",
+  SUM: "FUNCTION",
+  AVG: "FUNCTION",
+  COUNT: "FUNCTION",
 };
 
 const OPERATORS = {
@@ -47,6 +47,7 @@ const OPERATORS = {
 };
 
 const ERROR_TYPES = {
+  UNKOWN_KEYWORD: "ERROR(000): UNKNOWN KEYWORD: ",
   CRUD_KEYWORD:
     "Error(001): Missing CRUD keyword. An action must be specified. Use one of: LET, GET, UPD, DLT.",
   CRUD_OPERATIONS:
@@ -55,7 +56,11 @@ const ERROR_TYPES = {
   CRUD_MULTIPLE_TABLES:
     "ERROR(003): You can only perform one CRUD operation on a single table at a time: ",
   MISSING_TABLE: "ERROR(004): Your query is missing a table name.",
-  MISPLACED_TABLE_NAME: "ERROR(004): Misplaced table name: ",
+  MISPLACED_TABLE_NAME: "ERROR(005): Misplaced table name: ",
+  MISSING_CRUD_OPERATION:
+    "ERROR(006): Missing operation. Please use one of: LET, GET, UPD, DLT.",
+  ID_NOT_NEEDED:
+    "ERROR(007): ID is created automatically, remove the provided id: ",
 };
 
 function lexer(VALUE) {
@@ -100,6 +105,13 @@ function lexer(VALUE) {
           }
         }
 
+        for (let key in FUNCTIONS) {
+          if (word.includes(key)) {
+            type = FUNCTIONS[key];
+            word = word;
+          }
+        }
+
         if (type != type.toUpperCase()) {
           tokens.push({ type: "TABLE", value: word, position: i });
         } else {
@@ -113,8 +125,6 @@ function lexer(VALUE) {
       tokens.push({ type: type, value: word, position: i });
     }
   });
-
-  console.log(tokens);
 
   return tokens;
 }
@@ -131,6 +141,7 @@ export function parser(VALUE) {
   let keywords = [];
   let datatypes = [];
   let operators = [];
+  let functions = [];
 
   const atsNode = {
     action: "",
@@ -173,7 +184,7 @@ export function parser(VALUE) {
     TABLES.forEach((action, i) => {
       tables += `${action.value} at position ${action.position}${ACTIONS_LENGTH == i + 1 ? ", " : "."}`;
     });
-    error = `${ERROR_TYPES.CRUD_MULTIPLE_TABLES}` + tables;
+    error = `${ERROR_TYPES.CRUD_MULTIPLE_TABLES} ${tables}`;
     errors.push(error);
   }
 
@@ -182,71 +193,114 @@ export function parser(VALUE) {
     return errors;
   }
 
+  // Collect language elements into typed arrays for validation
   TOKENS.forEach((token, i) => {
     if (token.type != "TABLE") {
       switch (token.type) {
         case "FIELD":
-          console.log("Field: ", token.value, token.type, i);
-          fields.push(token.value);
+          fields.push(token);
           break;
         case "VALUE":
-          console.log("value: ", token.value, token.type, i);
-          values.push(token.value);
+          values.push(token);
           break;
         case "IDENTIFICATION":
-          console.log("Id: ", token.value, token.type, i);
-          ids.push(token.value);
+          ids.push(token);
           break;
         case "LIMITAION":
-          console.log("Limit: ", token.value, token.type, i);
-          limits.push(token.value);
+          limits.push(token);
           break;
 
         case "ACTION":
-          // Catching a misplaced table
+          // Catching a misplaced CURD keyword
           if (i != 0) {
             error = `${ERROR_TYPES.CRUD_KEYWORD_MISPLACED} ${token.value} at position ${token.position}, CRUD keyword must be the first word in the query."`;
             errors.push(error);
           } else {
-            atsNode.action = "create";
+            atsNode.action = token.value;
+          }
+          break;
+
+        case "KEYWORD":
+          for (let keyword in KEYWORDS) {
+            if (keyword == token.value) {
+              keywords.push(token);
+            }
+          }
+          break;
+
+        case "DATATYPE":
+          for (let keyword in DATATYPES) {
+            if (keyword == token.value) {
+              datatypes.push(token);
+            }
+          }
+          break;
+
+        case "OPERATOR":
+          for (let keyword in OPERATORS) {
+            if (keyword == token.value) {
+              operators.push(token);
+            }
           }
           break;
 
         default:
-          for (let keyword in KEYWORDS) {
-            if (token.type == "KEYWORD" && keyword == token.value) {
-              console.log("Keyword: ", keyword, token.type, i);
-              keywords.push(token.value);
-            }
-          }
-
-          for (let keyword in DATATYPES) {
-            if (token.type == "DATATYPE" && keyword == token.value) {
-              console.log("Datatype", keyword, token.type, i);
-              datatypes.push(token.type);
-            }
-          }
-
-          for (let keyword in OPERATORS) {
-            if (token.type == "OPERATOR" && keyword == token.value) {
-              console.log("Operator", keyword, token.type, i);
-              operators.push(token.type);
-            }
-          }
+          error = `${ERROR_TYPES.UNKOWN_KEYWORD} ${token.value} at postition ${token.position}`;
+          errors.push(error);
           break;
       }
     } else {
+      // Catching a misplaced table
       if (TOKENS[i - 1]?.type != "ACTION") {
         error = `${ERROR_TYPES.MISPLACED_TABLE_NAME} at position ${token.position}.`;
         errors.push(error);
       }
-      console.log("TABLE", token.type, token.value, i);
+      atsNode.table = token.value;
     }
   });
 
   if (errors.length > 0) {
     console.log(errors);
     return errors;
+  }
+
+  const IDS_LENGTH = ids.length;
+  const LIMITS_LENGTH = limits.length;
+  const OPERATORS_LENGTH = operators.length;
+  const KEYWORDS_LENGTH = keywords.length;
+  const FUNCTIONS_LENGTH = functions.length;
+  const DATATYPES_LENGTH = datatypes.length;
+
+  switch (atsNode.action) {
+    case "LET":
+      // Catching when ID is created manually
+      if (IDS_LENGTH == 0) {
+      } else {
+        let idsInfo = "";
+        ids.forEach((id, i) => {
+          idsInfo += `${id.value} at position ${id.position}${IDS_LENGTH == i + 1 ? ", " : "."}`;
+        });
+        error = `${ERROR_TYPES.ID_NOT_NEEDED} ${idsInfo}`;
+        errors.push(error);
+      }
+      break;
+
+    case "GET":
+      break;
+
+    case "UPD":
+      break;
+
+    case "DLT":
+      break;
+
+    case "DROP":
+      break;
+
+    default:
+      errors.push(ERROR_TYPES.MISSING_CRUD_OPERATION);
+      return errors;
+      break;
   }
 
   console.log(fields, values);
