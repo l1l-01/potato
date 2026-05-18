@@ -47,20 +47,24 @@ const OPERATORS = {
 };
 
 const ERROR_TYPES = {
-  UNKOWN_KEYWORD: "ERROR(000): UNKNOWN KEYWORD: ",
+  EMPTY_QUERY: "ERROR(000): Your query is empty.",
+  UNKOWN_KEYWORD: "ERROR(001): UNKNOWN KEYWORD: ",
   CRUD_KEYWORD:
-    "Error(001): Missing CRUD keyword. An action must be specified. Use one of: LET, GET, UPD, DLT.",
+    "Error(002): Missing CRUD keyword. An action must be specified. Use one of: LET, GET, UPD, DLT.",
   CRUD_OPERATIONS:
-    "Error(002): Only one CRUD operation can run at a time. You are trying to use more than one: ",
-  CRUD_KEYWORD_MISPLACED: "ERROR(003): Misplaced CRUD keyword: ",
+    "Error(003): Only one CRUD operation can run at a time. You are trying to use more than one: ",
+  CRUD_KEYWORD_MISPLACED: "ERROR(004): Misplaced CRUD keyword: ",
   CRUD_MULTIPLE_TABLES:
-    "ERROR(003): You can only perform one CRUD operation on a single table at a time: ",
-  MISSING_TABLE: "ERROR(004): Your query is missing a table name.",
-  MISPLACED_TABLE_NAME: "ERROR(005): Misplaced table name: ",
+    "ERROR(005): You can only perform one CRUD operation on a single table at a time: ",
+  MISSING_TABLE: "ERROR(006): Your query is missing a table name.",
+  MISPLACED_TABLE_NAME: "ERROR(007): Misplaced table name: ",
   MISSING_CRUD_OPERATION:
-    "ERROR(006): Missing operation. Please use one of: LET, GET, UPD, DLT.",
+    "ERROR(008): Missing operation. Please use one of: LET, GET, UPD, DLT.",
   ID_NOT_NEEDED:
-    "ERROR(007): ID is created automatically, remove the provided id: ",
+    "ERROR(009): ID is created automatically, remove the provided id: ",
+  LIMIT_UNUSABLE: "ERROR(010): Limit can only be used in a GET query: ",
+  OPERATOR_UNUSABLE: "ERROR(011): Operators can only be used in a GET query: ",
+  FUNCTION_UNUSABLE: "ERROR(012): Functions can only be used in a GET query: ",
 };
 
 function lexer(VALUE) {
@@ -126,14 +130,21 @@ function lexer(VALUE) {
     }
   });
 
+  console.log(tokens);
   return tokens;
 }
 
 export function parser(VALUE) {
-  const TOKENS = lexer(VALUE);
-
   let error = "";
   let errors = [];
+
+  // Catch empty query
+  if (VALUE.trim() == "") {
+    errors.push(ERROR_TYPES.EMPTY_QUERY);
+  }
+
+  const TOKENS = lexer(VALUE);
+
   let fields = [];
   let ids = [];
   let limits = [];
@@ -195,67 +206,78 @@ export function parser(VALUE) {
 
   // Collect language elements into typed arrays for validation
   TOKENS.forEach((token, i) => {
-    if (token.type != "TABLE") {
-      switch (token.type) {
-        case "FIELD":
-          fields.push(token);
-          break;
-        case "VALUE":
-          values.push(token);
-          break;
-        case "IDENTIFICATION":
-          ids.push(token);
-          break;
-        case "LIMITAION":
-          limits.push(token);
-          break;
-
-        case "ACTION":
-          // Catching a misplaced CURD keyword
-          if (i != 0) {
-            error = `${ERROR_TYPES.CRUD_KEYWORD_MISPLACED} ${token.value} at position ${token.position}, CRUD keyword must be the first word in the query."`;
-            errors.push(error);
-          } else {
-            atsNode.action = token.value;
-          }
-          break;
-
-        case "KEYWORD":
-          for (let keyword in KEYWORDS) {
-            if (keyword == token.value) {
-              keywords.push(token);
-            }
-          }
-          break;
-
-        case "DATATYPE":
-          for (let keyword in DATATYPES) {
-            if (keyword == token.value) {
-              datatypes.push(token);
-            }
-          }
-          break;
-
-        case "OPERATOR":
-          for (let keyword in OPERATORS) {
-            if (keyword == token.value) {
-              operators.push(token);
-            }
-          }
-          break;
-
-        default:
-          error = `${ERROR_TYPES.UNKOWN_KEYWORD} ${token.value} at postition ${token.position}`;
+    switch (token.type) {
+      case "TABLE":
+        // Catching a misplaced table
+        if (TOKENS[i - 1]?.type != "ACTION") {
+          error = `${ERROR_TYPES.MISPLACED_TABLE_NAME} at position ${token.position}.`;
           errors.push(error);
-          break;
-      }
-    } else {
-      // Catching a misplaced table
-      if (TOKENS[i - 1]?.type != "ACTION") {
-        error = `${ERROR_TYPES.MISPLACED_TABLE_NAME} at position ${token.position}.`;
+        }
+        atsNode.table = token.value;
+        break;
+
+      case "FIELD":
+        fields.push(token);
+        break;
+
+      case "VALUE":
+        values.push(token);
+        break;
+
+      case "IDENTIFICATION":
+        ids.push(token);
+        break;
+
+      case "LIMITAION":
+        limits.push(token);
+        break;
+
+      case "ACTION":
+        // Catching a misplaced CURD keyword
+        if (i != 0) {
+          error = `${ERROR_TYPES.CRUD_KEYWORD_MISPLACED} ${token.value} at position ${token.position}, CRUD keyword must be the first word in the query."`;
+          errors.push(error);
+        } else {
+          atsNode.action = token.value;
+        }
+        break;
+
+      case "KEYWORD":
+        for (let keyword in KEYWORDS) {
+          if (keyword == token.value) {
+            keywords.push(token);
+          }
+        }
+        break;
+
+      case "DATATYPE":
+        for (let keyword in DATATYPES) {
+          if (keyword == token.value) {
+            datatypes.push(token);
+          }
+        }
+        break;
+
+      case "OPERATOR":
+        for (let keyword in OPERATORS) {
+          if (keyword == token.value) {
+            operators.push(token);
+          }
+        }
+        break;
+
+      case "FUNCTION":
+        for (let keyword in FUNCTIONS) {
+          if (keyword == token.value) {
+            functions.push(token);
+          }
+        }
+        break;
+
+      default:
+        error = `${ERROR_TYPES.UNKOWN_KEYWORD} ${token.value} at postition ${token.position}`;
         errors.push(error);
-      }
-      atsNode.table = token.value;
+        break;
     }
   });
 
@@ -274,15 +296,47 @@ export function parser(VALUE) {
   switch (atsNode.action) {
     case "LET":
       // Catching when ID is created manually
-      if (IDS_LENGTH == 0) {
-      } else {
+      if (IDS_LENGTH != 0) {
         let idsInfo = "";
         ids.forEach((id, i) => {
-          idsInfo += `${id.value} at position ${id.position}${IDS_LENGTH == i + 1 ? ", " : "."}`;
+          idsInfo += `#${id.value} at position ${id.position}${IDS_LENGTH == i + 1 ? ", " : "."}`;
         });
         error = `${ERROR_TYPES.ID_NOT_NEEDED} ${idsInfo}`;
         errors.push(error);
       }
+
+      // Catching when limit is used on a LET query
+      if (LIMITS_LENGTH != 0) {
+        let limitsInfo = "";
+        limits.forEach((limit, i) => {
+          limitsInfo += `@${limit.value} at position ${limit.position}${LIMITS_LENGTH == i + 1 ? "." : ","}`;
+        });
+        error = `${ERROR_TYPES.LIMIT_UNUSABLE} ${limitsInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when operators is used on a LET query
+      if (OPERATORS_LENGTH != 0) {
+        let operatorsInfo = "";
+        operators.forEach((operator, i) => {
+          operatorsInfo += `${operator.value} at position ${operator.position}${OPERATORS_LENGTH == i + 1 ? "." : ","}`;
+        });
+        error = `${ERROR_TYPES.OPERATOR_UNUSABLE} ${operatorsInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when operators is used on a LET query
+      if (FUNCTIONS_LENGTH != 0) {
+        let funcsInfo = "";
+        functions.forEach((func, i) => {
+          funcsInfo += `${func.value} at position ${func.position}${FUNCTIONS_LENGTH == i + 1 ? "." : ","}`;
+        });
+        error = `${ERROR_TYPES.FUNCTION_UNUSABLE} ${funcsInfo}`;
+        errors.push(error);
+      }
+
+      console.log(errors);
+
       break;
 
     case "GET":
