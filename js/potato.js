@@ -387,16 +387,31 @@ export function parser(VALUE) {
             value: target[0]?.value,
           });
         });
-        console.log(atsNode);
       } else if (DATATYPES_LENGTH > FIELDS_LENGTH) {
-        errors.push(ERROR_TYPES.MISSING_FIELD);
+        // Catching missing field(s)
+        let info = "";
+        datatypes.forEach((type, i) => {
+          if (fields[i]?.value === undefined) {
+            info += `${type?.value} at position ${type?.position} doesn't relate to any field. `;
+          }
+        });
+
+        error = `${ERROR_TYPES.MISSING_FIELD} ${info}`;
+        errors.push(error);
       } else if (DATATYPES_LENGTH < FIELDS_LENGTH) {
-        errors.push(ERROR_TYPES.MISSING_DATATYPE);
+        // Catching missing datatype(s)
+        let info = "";
+        fields.forEach((field, i) => {
+          if (datatypes[i]?.value === undefined) {
+            info += `$${field?.value} at position ${field?.position} doesn't relate to any field. `;
+          }
+        });
+
+        error = `${ERROR_TYPES.MISSING_DATATYPE} ${info}`;
+        errors.push(error);
       } else if (DATATYPES_LENGTH == 0 && FIELDS_LENGTH == 0) {
         errors.push(ERROR_TYPES.MISSING_FIELD_DATATYPE);
       }
-
-      console.log(errors);
 
       break;
 
@@ -417,8 +432,7 @@ export function parser(VALUE) {
       return errors;
       break;
   }
-
-  console.log(fields, values);
-
+  console.log("Errors: ", errors);
+  console.log(atsNode);
   //console.log(atsNode, errors, fields);
 }
