@@ -65,10 +65,15 @@ const ERROR_TYPES = {
   LIMIT_UNUSABLE: "ERROR(010): Limit can only be used in a GET query: ",
   OPERATOR_UNUSABLE: "ERROR(011): Operators can only be used in a GET query: ",
   FUNCTION_UNUSABLE: "ERROR(012): Functions can only be used in a GET query: ",
+  KEYWORD_UNUSABLE:
+    "ERROR(013): Keywords can only be used in a GET and update query: ",
   MISSING_FIELD_DATATYPE:
-    "ERROR(013): Fields and their types are required to create a table.",
-  MISSING_FIELD: "ERROR(014): Missing field(s).",
-  MISSING_DATATYPE: "ERROR(015): Missing datatype(s).",
+    "ERROR(014): Fields and their types are required to create a table.",
+  MISSING_FIELD: "ERROR(015): Missing field(s).",
+  MISSING_DATATYPE: "ERROR(016): Missing datatype(s).",
+  MISPLACED_DATATYPE: "ERROR(017): Datatype must appear after its field: ",
+  MISPLACED_VALUE:
+    "ERROR(018): Value must appear after its field or after its field's datatype: ",
 };
 
 function lexer(VALUE) {
@@ -139,7 +144,6 @@ function lexer(VALUE) {
 }
 
 export function parser(VALUE) {
-  let error = "";
   let errors = [];
 
   // Catch empty query
@@ -184,7 +188,7 @@ export function parser(VALUE) {
     ACTIONS.forEach((action, i) => {
       operations += `${action.value} at position ${action.position}${ACTIONS_LENGTH == i + 1 ? "." : ", "}`;
     });
-    error = ERROR_TYPES.CRUD_OPERATIONS + operations;
+    const error = ERROR_TYPES.CRUD_OPERATIONS + operations;
     errors.push(error);
   }
 
@@ -199,7 +203,7 @@ export function parser(VALUE) {
     TABLES.forEach((action, i) => {
       tables += `${action.value} at position ${action.position}${ACTIONS_LENGTH == i + 1 ? ", " : "."}`;
     });
-    error = `${ERROR_TYPES.CRUD_MULTIPLE_TABLES} ${tables}`;
+    const error = `${ERROR_TYPES.CRUD_MULTIPLE_TABLES} ${tables}`;
     errors.push(error);
   }
 
@@ -210,12 +214,12 @@ export function parser(VALUE) {
 
   // Collect language elements into typed arrays for validation
   TOKENS.forEach((token, i) => {
-    let wordPosition = i + 1;
+    const wordPosition = i + 1;
     switch (token.type) {
       case "TABLE":
         // Catching a misplaced table
-        if (TOKENS[i - 1]?.type != "ACTION") {
-          error = `${ERROR_TYPES.MISPLACED_TABLE_NAME} at position ${wordPosition}.`;
+        if (TOKENS[i - 1]?.type !== "ACTION") {
+          const error = `${ERROR_TYPES.MISPLACED_TABLE_NAME} at position ${wordPosition}.`;
           errors.push(error);
         }
         atsNode.table = token.value;
@@ -230,6 +234,15 @@ export function parser(VALUE) {
         break;
 
       case "VALUE":
+        // Catching a misplaced CURD value
+        if (
+          TOKENS[i - 1].type !== "FIELD" &&
+          TOKENS[i - 1].type !== "DATAYPE"
+        ) {
+          const error = `${ERROR_TYPES.MISPLACED_VALUE} ${token.value} at position ${wordPosition}.`;
+          errors.push(error);
+        }
+
         values.push({
           type: token.type,
           value: token.value,
@@ -256,7 +269,7 @@ export function parser(VALUE) {
       case "ACTION":
         // Catching a misplaced CURD keyword
         if (i != 0) {
-          error = `${ERROR_TYPES.CRUD_KEYWORD_MISPLACED} ${token.value} at position ${wordPosition}, CRUD keyword must be the first word in the query."`;
+          const error = `${ERROR_TYPES.CRUD_KEYWORD_MISPLACED} ${token.value} at position ${wordPosition}, CRUD keyword must be the first word in the query.`;
           errors.push(error);
         } else {
           atsNode.action = token.value;
@@ -276,6 +289,12 @@ export function parser(VALUE) {
         break;
 
       case "DATATYPE":
+        // Catching when a datatype is not posisioned after a field
+        if (TOKENS[i - 1].type !== "FIELD") {
+          const error = `${ERROR_TYPES.MISPLACED_DATATYPE} ${token.value} at position ${wordPosition}`;
+          errors.push(error);
+        }
+
         for (let keyword in DATATYPES) {
           if (keyword == token.value) {
             datatypes.push({
@@ -312,7 +331,7 @@ export function parser(VALUE) {
         break;
 
       default:
-        error = `${ERROR_TYPES.UNKOWN_KEYWORD} ${token.value} at postition ${wordPosition}`;
+        const error = `${ERROR_TYPES.UNKOWN_KEYWORD} ${token.value} at postition ${wordPosition}`;
         errors.push(error);
         break;
     }
@@ -340,7 +359,7 @@ export function parser(VALUE) {
         ids.forEach((id, i) => {
           idsInfo += `#${id.value} at position ${id.position}${IDS_LENGTH == i + 1 ? ", " : "."}`;
         });
-        error = `${ERROR_TYPES.ID_NOT_NEEDED} ${idsInfo}`;
+        const error = `${ERROR_TYPES.ID_NOT_NEEDED} ${idsInfo}`;
         errors.push(error);
       }
 
@@ -350,27 +369,37 @@ export function parser(VALUE) {
         limits.forEach((limit, i) => {
           limitsInfo += `@${limit.value} at position ${limit.position}${LIMITS_LENGTH == i + 1 ? "." : ","}`;
         });
-        error = `${ERROR_TYPES.LIMIT_UNUSABLE} ${limitsInfo}`;
+        const error = `${ERROR_TYPES.LIMIT_UNUSABLE} ${limitsInfo}`;
         errors.push(error);
       }
 
-      // Catching when operators is used on a LET query
+      // Catching when operators are used on a LET query
       if (OPERATORS_LENGTH !== 0) {
         let operatorsInfo = "";
         operators.forEach((operator, i) => {
           operatorsInfo += `${operator.value} at position ${operator.position}${OPERATORS_LENGTH == i + 1 ? "." : ","}`;
         });
-        error = `${ERROR_TYPES.OPERATOR_UNUSABLE} ${operatorsInfo}`;
+        const error = `${ERROR_TYPES.OPERATOR_UNUSABLE} ${operatorsInfo}`;
         errors.push(error);
       }
 
-      // Catching when functions is used on a LET query
+      // Catching when functions are used on a LET query
       if (FUNCTIONS_LENGTH != 0) {
         let funcsInfo = "";
         functions.forEach((func, i) => {
           funcsInfo += `${func.value} at position ${func.position}${FUNCTIONS_LENGTH == i + 1 ? "." : ","}`;
         });
-        error = `${ERROR_TYPES.FUNCTION_UNUSABLE} ${funcsInfo}`;
+        const error = `${ERROR_TYPES.FUNCTION_UNUSABLE} ${funcsInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when keywords are used on a LET query
+      if (KEYWORDS_LENGTH != 0) {
+        let keywordsInfo = "";
+        keywords.forEach((keyword, i) => {
+          keywordsInfo += `${keyword.value} at position ${keyword.position}${KEYWORDS_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.KEYWORD_UNUSABLE} ${keywordsInfo}`;
         errors.push(error);
       }
 
@@ -396,7 +425,7 @@ export function parser(VALUE) {
           }
         });
 
-        error = `${ERROR_TYPES.MISSING_FIELD} ${info}`;
+        const error = `${ERROR_TYPES.MISSING_FIELD} ${info}`;
         errors.push(error);
       } else if (DATATYPES_LENGTH < FIELDS_LENGTH) {
         // Catching missing datatype(s)
@@ -407,7 +436,7 @@ export function parser(VALUE) {
           }
         });
 
-        error = `${ERROR_TYPES.MISSING_DATATYPE} ${info}`;
+        const error = `${ERROR_TYPES.MISSING_DATATYPE} ${info}`;
         errors.push(error);
       } else if (DATATYPES_LENGTH == 0 && FIELDS_LENGTH == 0) {
         errors.push(ERROR_TYPES.MISSING_FIELD_DATATYPE);
