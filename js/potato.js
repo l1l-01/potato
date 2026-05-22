@@ -74,6 +74,8 @@ const ERROR_TYPES = {
   MISPLACED_DATATYPE: "ERROR(017): Datatype must appear after its field: ",
   MISPLACED_VALUE:
     "ERROR(018): Value must appear after its field or after its field's datatype: ",
+  DATATYPES_NOT_ALLOWED: "ERROR(018): Datatype(s) not allowed: ",
+  REPEATED_WHERE: "ERROR(019): You can only use one WHERE keyword: ",
 };
 
 function lexer(VALUE) {
@@ -165,7 +167,8 @@ export function parser(VALUE) {
   const atsNode = {
     action: "",
     table: "",
-    column: [],
+    columns: [],
+    condition: false,
   };
 
   //* Catch missing CRUD operator && Detect multiple CRUD operations used simultaneously
@@ -235,9 +238,11 @@ export function parser(VALUE) {
 
       case "VALUE":
         // Catching a misplaced CURD value
+        const beforeValue = TOKENS[i - 1].type;
         if (
-          TOKENS[i - 1].type !== "FIELD" &&
-          TOKENS[i - 1].type !== "DATAYPE"
+          beforeValue !== "FIELD" &&
+          beforeValue !== "DATATYPE" &&
+          beforeValue !== "OPERATOR"
         ) {
           const error = `${ERROR_TYPES.MISPLACED_VALUE} ${token.value} at position ${wordPosition}.`;
           errors.push(error);
@@ -410,7 +415,7 @@ export function parser(VALUE) {
           const target = values.filter(
             (value) => value?.position === field?.position + 2,
           );
-          atsNode.column.push({
+          atsNode.columns.push({
             name: field.value,
             datatype: datatypes[i]?.value,
             value: target[0]?.value,
@@ -448,6 +453,63 @@ export function parser(VALUE) {
       break;
 
     case "UPD":
+      // Catching when FUNCTIONS are used on a LET query
+      if (FUNCTIONS_LENGTH != 0) {
+        let funcsInfo = "";
+        functions.forEach((func, i) => {
+          funcsInfo += `${func.value} at position ${func.position}${FUNCTIONS_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.FUNCTION_UNUSABLE} ${funcsInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when DATATYPES are used on a LET query
+      if (DATATYPES_LENGTH != 0) {
+        let typesInfo = "";
+        datatypes.forEach((type, i) => {
+          typesInfo += `${type.value} at position ${type.position}${DATATYPES_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.DATATYPES_NOT_ALLOWED} ${typesInfo}`;
+        errors.push(error);
+      }
+
+      // Catching duplicated WHERE keyword in an UPD query
+      const WHERE_KEYWORDS = keywords.filter((key) => key?.value === "WHERE");
+      const WHERE_LENGTH = WHERE_KEYWORDS.length;
+
+      if (WHERE_LENGTH > 1) {
+        const whereInfo = WHERE_KEYWORDS.forEach((key, i) => {
+          funcsInfo += `${key.value} at position ${key.position}${WHERE_LENGTH.length == i + 1 ? "." : ","}`;
+        });
+
+        const error = `${ERROR_TYPES.REPEATED_WHERE} ${whereInfo}`;
+        errors.push();
+      }
+
+      // Creating columns
+      fields.forEach((field, i) => {
+        const vTarget = values.filter(
+          (value) =>
+            value?.position === field?.position + 1 ||
+            value?.position === field?.position + 2,
+        );
+
+        // Todo: separate WHERE keyword from other keywords
+        const kTarget = keywords.filter(
+          (key) => key?.position === field?.position - 1,
+        );
+
+        atsNode.columns.push({
+          name: field.value,
+          value: vTarget[0]?.value,
+          // TODO: correct this part
+          condition: kTarget[0]?.value,
+        });
+
+        if (kTarget[0]?.value === "WHERE") {
+          atsNode.condition = true;
+        }
+      });
       break;
 
     case "DLT":
@@ -462,6 +524,5 @@ export function parser(VALUE) {
       break;
   }
   console.log("Errors: ", errors);
-  console.log(atsNode);
-  //console.log(atsNode, errors, fields);
+  console.log("AST", atsNode);
 }
