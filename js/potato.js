@@ -76,9 +76,17 @@ const ERROR_TYPES = {
     "ERROR(018): Value must appear after its field or after its field's datatype: ",
   DATATYPES_NOT_ALLOWED: "ERROR(018): Datatype(s) not allowed: ",
   REPEATED_WHERE: "ERROR(019): You can only use one WHERE keyword: ",
+  UNDEFINED_AND_STATE:
+    "ERROR(020): You can't use the AND keyword at the end of the query, ",
+  NOT_ALLOWED_AFTER_AND:
+    "ERROR(010): You can't use the AND keyword at the end of the query: ",
 };
 
 function lexer(VALUE) {
+  if (VALUE.trim() == "") {
+    errors.push(ERROR_TYPES.EMPTY_QUERY);
+  }
+
   let tokens = [];
   let type = null;
   const MAIN_RE = new RegExp(
@@ -127,7 +135,7 @@ function lexer(VALUE) {
           }
         }
 
-        if (type != type.toUpperCase()) {
+        if (type !== type.toUpperCase()) {
           tokens.push({ type: "TABLE", value: word, position: i });
         } else {
           tokens.push({ type: type, value: word, position: i });
@@ -149,10 +157,6 @@ export function parser(VALUE) {
   let errors = [];
 
   // Catch empty query
-  if (VALUE.trim() == "") {
-    errors.push(ERROR_TYPES.EMPTY_QUERY);
-  }
-
   const TOKENS = lexer(VALUE);
 
   let fields = [];
@@ -184,7 +188,7 @@ export function parser(VALUE) {
 
   const ACTIONS_LENGTH = ACTIONS.length;
 
-  if (ACTIONS_LENGTH == 0) {
+  if (ACTIONS_LENGTH === 0) {
     errors.push(ERROR_TYPES.CRUD_KEYWORD);
   } else if (ACTIONS_LENGTH >= 2) {
     let operations = "";
@@ -199,7 +203,7 @@ export function parser(VALUE) {
   const TABLES = TOKENS.filter((token) => token.type == "TABLE");
   const TABLES_LENGTH = TABLES.length;
 
-  if (TABLES_LENGTH == 0) {
+  if (TABLES_LENGTH === 0) {
     errors.push(ERROR_TYPES.MISSING_TABLE);
   } else if (TABLES_LENGTH > 1) {
     let tables = "";
@@ -208,11 +212,6 @@ export function parser(VALUE) {
     });
     const error = `${ERROR_TYPES.CRUD_MULTIPLE_TABLES} ${tables}`;
     errors.push(error);
-  }
-
-  if (errors.length > 0) {
-    console.log(errors);
-    return errors;
   }
 
   // Collect language elements into typed arrays for validation
@@ -273,7 +272,7 @@ export function parser(VALUE) {
 
       case "ACTION":
         // Catching a misplaced CURD keyword
-        if (i != 0) {
+        if (i !== 0) {
           const error = `${ERROR_TYPES.CRUD_KEYWORD_MISPLACED} ${token.value} at position ${wordPosition}, CRUD keyword must be the first word in the query.`;
           errors.push(error);
         } else {
@@ -282,8 +281,23 @@ export function parser(VALUE) {
         break;
 
       case "KEYWORD":
+        const nextToken = TOKENS[i + 1];
+        if (token.value === "AND") {
+          if (nextToken?.value === undefined) {
+            const error = `${ERROR_TYPES.UNDEFINED_AND_STATE} at position ${token.position}.`;
+            errors.push(error);
+          } else if (
+            nextToken?.type !== "IDENTIFICATION" &&
+            nextToken?.type !== "FIELD" &&
+            nextToken?.type !== "VALUE"
+          ) {
+            const error = `${ERROR_TYPES.NOT_ALLOWED_AFTER_AND} ${token.value} at position ${token.position}.`;
+            errors.push(error);
+          }
+        }
+
         for (let keyword in KEYWORDS) {
-          if (keyword == token.value) {
+          if (keyword === token.value) {
             keywords.push({
               type: token.type,
               value: token.value,
@@ -301,7 +315,7 @@ export function parser(VALUE) {
         }
 
         for (let keyword in DATATYPES) {
-          if (keyword == token.value) {
+          if (keyword === token.value) {
             datatypes.push({
               type: token.type,
               value: token.value,
@@ -313,7 +327,7 @@ export function parser(VALUE) {
 
       case "OPERATOR":
         for (let keyword in OPERATORS) {
-          if (keyword == token.value) {
+          if (keyword === token.value) {
             operators.push({
               type: token.type,
               value: token.value,
@@ -325,7 +339,7 @@ export function parser(VALUE) {
 
       case "FUNCTION":
         for (let keyword in FUNCTIONS) {
-          if (keyword == token.value) {
+          if (keyword === token.value) {
             functions.push({
               type: token.type,
               value: token.value,
@@ -389,7 +403,7 @@ export function parser(VALUE) {
       }
 
       // Catching when functions are used on a LET query
-      if (FUNCTIONS_LENGTH != 0) {
+      if (FUNCTIONS_LENGTH !== 0) {
         let funcsInfo = "";
         functions.forEach((func, i) => {
           funcsInfo += `${func.value} at position ${func.position}${FUNCTIONS_LENGTH == i + 1 ? "." : ","}`;
@@ -399,7 +413,7 @@ export function parser(VALUE) {
       }
 
       // Catching when keywords are used on a LET query
-      if (KEYWORDS_LENGTH != 0) {
+      if (KEYWORDS_LENGTH !== 0) {
         let keywordsInfo = "";
         keywords.forEach((keyword, i) => {
           keywordsInfo += `${keyword.value} at position ${keyword.position}${KEYWORDS_LENGTH == i + 1 ? "." : ","}`;
@@ -409,7 +423,7 @@ export function parser(VALUE) {
       }
 
       // Catching when DATATYPES_LENGTH is different than FIELDS_LENGTH in a LET query
-      if (DATATYPES_LENGTH == FIELDS_LENGTH) {
+      if (DATATYPES_LENGTH === FIELDS_LENGTH) {
         // Creating columns
         fields.forEach((field, i) => {
           const target = values.filter(
@@ -443,7 +457,7 @@ export function parser(VALUE) {
 
         const error = `${ERROR_TYPES.MISSING_DATATYPE} ${info}`;
         errors.push(error);
-      } else if (DATATYPES_LENGTH == 0 && FIELDS_LENGTH == 0) {
+      } else if (DATATYPES_LENGTH === 0 && FIELDS_LENGTH === 0) {
         errors.push(ERROR_TYPES.MISSING_FIELD_DATATYPE);
       }
 
@@ -454,7 +468,7 @@ export function parser(VALUE) {
 
     case "UPD":
       // Catching when FUNCTIONS are used on a LET query
-      if (FUNCTIONS_LENGTH != 0) {
+      if (FUNCTIONS_LENGTH !== 0) {
         let funcsInfo = "";
         functions.forEach((func, i) => {
           funcsInfo += `${func.value} at position ${func.position}${FUNCTIONS_LENGTH == i + 1 ? "." : ","}`;
@@ -464,7 +478,7 @@ export function parser(VALUE) {
       }
 
       // Catching when DATATYPES are used on a LET query
-      if (DATATYPES_LENGTH != 0) {
+      if (DATATYPES_LENGTH !== 0) {
         let typesInfo = "";
         datatypes.forEach((type, i) => {
           typesInfo += `${type.value} at position ${type.position}${DATATYPES_LENGTH == i + 1 ? "." : ","}`;
@@ -478,12 +492,13 @@ export function parser(VALUE) {
       const WHERE_LENGTH = WHERE_KEYWORDS.length;
 
       if (WHERE_LENGTH > 1) {
-        const whereInfo = WHERE_KEYWORDS.forEach((key, i) => {
-          funcsInfo += `${key.value} at position ${key.position}${WHERE_LENGTH.length == i + 1 ? "." : ","}`;
+        let whereInfo = "";
+        WHERE_KEYWORDS.forEach((key, i) => {
+          whereInfo += `${key.value} at position ${key.position}${WHERE_LENGTH.length == i + 1 ? "." : ","}`;
         });
 
         const error = `${ERROR_TYPES.REPEATED_WHERE} ${whereInfo}`;
-        errors.push();
+        errors.push(error);
       }
 
       // Creating columns
@@ -498,12 +513,36 @@ export function parser(VALUE) {
         const kTarget = keywords.filter(
           (key) => key?.position === field?.position - 1,
         );
+        const kValue =
+          kTarget[0]?.value !== "WHERE" ? kTarget[0]?.value : undefined;
 
+        let type = "";
+        switch (kValue) {
+          case "WHERE":
+            type = "condition_start";
+            break;
+
+          case "AND":
+          case "OR":
+            type = "condition";
+            break;
+
+          default:
+            type = "";
+            break;
+        }
+
+        if (kValue !== undefined && kValue === "AND") {
+          console.log(kValue);
+        }
+
+        // TODO: Not like this brother XD
         atsNode.columns.push({
           name: field.value,
           value: vTarget[0]?.value,
           // TODO: correct this part
-          condition: kTarget[0]?.value,
+          keyword: kValue,
+          type: type,
         });
 
         if (kTarget[0]?.value === "WHERE") {
