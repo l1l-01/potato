@@ -6,6 +6,7 @@ const KEYWORDS = {
   OR: "KEYWORD",
   WHERE: "KEYWORD",
   BETWEEN: "KEYWORD",
+  ",": "KEYWORD",
 };
 
 const ACTIONS = {
@@ -79,7 +80,7 @@ const ERROR_TYPES = {
   UNDEFINED_AND_STATE:
     "ERROR(020): You can't use the AND keyword at the end of the query, ",
   NOT_ALLOWED_AFTER_AND:
-    "ERROR(010): You can't use the AND keyword at the end of the query: ",
+    "ERROR(021): You are only allowed to use id (#1), field ($field) and value (:value) after the keyword AND: ",
 };
 
 function lexer(VALUE) {
@@ -138,7 +139,11 @@ function lexer(VALUE) {
         if (type !== type.toUpperCase()) {
           tokens.push({ type: "TABLE", value: word, position: i });
         } else {
-          tokens.push({ type: type, value: word, position: i });
+          if (word === ",") {
+            tokens.push({ type: "KEYWORD", value: ",", position: i });
+          } else {
+            tokens.push({ type: type, value: word, position: i });
+          }
         }
       }
     } else {
@@ -149,7 +154,7 @@ function lexer(VALUE) {
     }
   });
 
-  /*console.log(tokens);*/
+  console.log(tokens);
   return tokens;
 }
 
@@ -172,7 +177,8 @@ export function parser(VALUE) {
     action: "",
     table: "",
     columns: [],
-    condition: false,
+    condition: [],
+    isCondition: false,
   };
 
   //* Catch missing CRUD operator && Detect multiple CRUD operations used simultaneously
@@ -281,6 +287,7 @@ export function parser(VALUE) {
         break;
 
       case "KEYWORD":
+        // Catch when a query ends with the AND keyword and when invalid element types follow AND
         const nextToken = TOKENS[i + 1];
         if (token.value === "AND") {
           if (nextToken?.value === undefined) {
@@ -291,7 +298,7 @@ export function parser(VALUE) {
             nextToken?.type !== "FIELD" &&
             nextToken?.type !== "VALUE"
           ) {
-            const error = `${ERROR_TYPES.NOT_ALLOWED_AFTER_AND} ${token.value} at position ${token.position}.`;
+            const error = `${ERROR_TYPES.NOT_ALLOWED_AFTER_AND} ${nextToken.value} at position ${nextToken.position}.`;
             errors.push(error);
           }
         }
@@ -350,6 +357,7 @@ export function parser(VALUE) {
         break;
 
       default:
+        console.log(token);
         const error = `${ERROR_TYPES.UNKOWN_KEYWORD} ${token.value} at postition ${wordPosition}`;
         errors.push(error);
         break;
@@ -501,6 +509,8 @@ export function parser(VALUE) {
         errors.push(error);
       }
 
+      let conditions = [];
+
       // Creating columns
       fields.forEach((field, i) => {
         const vTarget = values.filter(
@@ -516,6 +526,8 @@ export function parser(VALUE) {
         const kValue =
           kTarget[0]?.value !== "WHERE" ? kTarget[0]?.value : undefined;
 
+        // TODO: Figure the condition scope
+
         let type = "";
         switch (kValue) {
           case "WHERE":
@@ -527,28 +539,40 @@ export function parser(VALUE) {
             type = "condition";
             break;
 
+          case ",":
+            type = "SCOPE";
+            break;
+
           default:
             type = "";
             break;
         }
-
         if (kValue !== undefined && kValue === "AND") {
           console.log(kValue);
         }
 
-        // TODO: Not like this brother XD
-        atsNode.columns.push({
-          name: field.value,
-          value: vTarget[0]?.value,
-          // TODO: correct this part
-          keyword: kValue,
-          type: type,
-        });
+        if (i === 0) {
+          atsNode.columns.push({
+            name: field.value,
+            value: vTarget[0]?.value,
+          });
+        } else {
+          conditions.push({
+            name: field.value,
+            value: vTarget[0]?.value,
+            keyword: kValue,
+            type: type,
+          });
+        }
+
+        console.log(conditions);
 
         if (kTarget[0]?.value === "WHERE") {
-          atsNode.condition = true;
+          atsNode.isCondition = true;
         }
       });
+
+      atsNode.condition = conditions;
       break;
 
     case "DLT":
