@@ -81,6 +81,8 @@ const ERROR_TYPES = {
     "ERROR(020): You can't use the AND keyword at the end of the query, ",
   NOT_ALLOWED_AFTER_AND:
     "ERROR(021): You are only allowed to use id (#1), field ($field) and value (:value) after the keyword AND: ",
+  NOT_ALLOWED_AFTER_SCOPE:
+    "ERROR(022): You are only allowed to use AND or OR or BETWEEN after the keyword ',': ",
 };
 
 function lexer(VALUE) {
@@ -301,6 +303,16 @@ export function parser(VALUE) {
             const error = `${ERROR_TYPES.NOT_ALLOWED_AFTER_AND} ${nextToken.value} at position ${nextToken.position}.`;
             errors.push(error);
           }
+        } else if (token.value === ",") {
+          // Catch when a query ends with the AND keyword and when invalid element types follow AND
+          if (
+            nextToken?.value !== "OR" &&
+            nextToken?.value !== "AND" &&
+            nextToken?.value !== "BETWEEN"
+          ) {
+            const error = `${ERROR_TYPES.NOT_ALLOWED_AFTER_SCOPE} ${nextToken.value} at position ${nextToken.position}.`;
+            errors.push(error);
+          }
         }
 
         for (let keyword in KEYWORDS) {
@@ -519,16 +531,23 @@ export function parser(VALUE) {
             value?.position === field?.position + 2,
         );
 
-        // Todo: separate WHERE keyword from other keywords
+        // Todo: handle BETWEEN
+
+        // Getting keyword before the field
         const kTarget = keywords.filter(
           (key) => key?.position === field?.position - 1,
         );
+
+        // Getting SCOPE keyword if it exist
+        const ScopeTarget = keywords.filter((key) => key?.value === ",");
+
         const kValue =
-          kTarget[0]?.value !== "WHERE" ? kTarget[0]?.value : undefined;
+          kTarget[0]?.value !== "WHERE" ? kTarget[0]?.value : "condition";
 
-        // TODO: Figure the condition scope
+        const scope = ScopeTarget[0]?.position === kTarget[0]?.position - 1;
 
-        let type = "";
+        // Setting column type
+        /*let type = "";
         switch (kValue) {
           case "WHERE":
             type = "condition_start";
@@ -539,17 +558,10 @@ export function parser(VALUE) {
             type = "condition";
             break;
 
-          case ",":
-            type = "SCOPE";
-            break;
-
           default:
-            type = "";
+            type = "data";
             break;
-        }
-        if (kValue !== undefined && kValue === "AND") {
-          console.log(kValue);
-        }
+        }*/
 
         if (i === 0) {
           atsNode.columns.push({
@@ -560,8 +572,11 @@ export function parser(VALUE) {
           conditions.push({
             name: field.value,
             value: vTarget[0]?.value,
-            keyword: kValue,
+            before: kValue,
+            /*
             type: type,
+            */
+            newScope: scope,
           });
         }
 
@@ -586,6 +601,7 @@ export function parser(VALUE) {
       return errors;
       break;
   }
+
   console.log("Errors: ", errors);
   console.log("AST", atsNode);
 }
