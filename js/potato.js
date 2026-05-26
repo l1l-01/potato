@@ -175,15 +175,16 @@ export function parser(VALUE) {
   let operators = [];
   let functions = [];
 
-  const atsNode = {
+  const AST = {
     action: "",
     table: "",
     columns: [],
+    fields: [],
     condition: [],
     isCondition: false,
   };
 
-  //* Catch missing CRUD operator && Detect multiple CRUD operations used simultaneously
+  // Catch missing CRUD operator && Detect multiple CRUD operations used simultaneously
   const ACTIONS =
     TOKENS.filter(
       (token) =>
@@ -207,7 +208,7 @@ export function parser(VALUE) {
     errors.push(error);
   }
 
-  //* Catching a CRUD operation on more than one table && Missing table name
+  // Catching a CRUD operation on more than one table && Missing table name
   const TABLES = TOKENS.filter((token) => token.type == "TABLE");
   const TABLES_LENGTH = TABLES.length;
 
@@ -232,7 +233,7 @@ export function parser(VALUE) {
           const error = `${ERROR_TYPES.MISPLACED_TABLE_NAME} at position ${wordPosition}.`;
           errors.push(error);
         }
-        atsNode.table = token.value;
+        AST.table = token.value;
         break;
 
       case "FIELD":
@@ -284,7 +285,7 @@ export function parser(VALUE) {
           const error = `${ERROR_TYPES.CRUD_KEYWORD_MISPLACED} ${token.value} at position ${wordPosition}, CRUD keyword must be the first word in the query.`;
           errors.push(error);
         } else {
-          atsNode.action = token.value;
+          AST.action = token.value;
         }
         break;
 
@@ -369,7 +370,6 @@ export function parser(VALUE) {
         break;
 
       default:
-        console.log(token);
         const error = `${ERROR_TYPES.UNKOWN_KEYWORD} ${token.value} at postition ${wordPosition}`;
         errors.push(error);
         break;
@@ -390,7 +390,7 @@ export function parser(VALUE) {
   const VALUE_LENGTH = values.length;
   const FIELDS_LENGTH = fields.length;
 
-  switch (atsNode.action) {
+  switch (AST.action) {
     case "LET":
       // Catching when ID is created manually
       if (IDS_LENGTH !== 0) {
@@ -449,7 +449,7 @@ export function parser(VALUE) {
           const target = values.filter(
             (value) => value?.position === field?.position + 2,
           );
-          atsNode.columns.push({
+          AST.columns.push({
             name: field.value,
             datatype: datatypes[i]?.value,
             value: target[0]?.value,
@@ -523,7 +523,7 @@ export function parser(VALUE) {
 
       let conditions = [];
 
-      // Creating columns
+      // Getting values & ids
       fields.forEach((field, i) => {
         const vTarget = values.filter(
           (value) =>
@@ -531,7 +531,15 @@ export function parser(VALUE) {
             value?.position === field?.position + 2,
         );
 
+        const idTarget = ids.filter(
+          (id) =>
+            id?.position === field?.position + 1 ||
+            id?.position === field?.position + 2,
+        );
+
         // Todo: handle BETWEEN
+        // Todo: handle ALL
+        // Todo: handle id update case
 
         // Getting keyword before the field
         const kTarget = keywords.filter(
@@ -546,36 +554,17 @@ export function parser(VALUE) {
 
         const scope = ScopeTarget[0]?.position === kTarget[0]?.position - 1;
 
-        // Setting column type
-        /*let type = "";
-        switch (kValue) {
-          case "WHERE":
-            type = "condition_start";
-            break;
-
-          case "AND":
-          case "OR":
-            type = "condition";
-            break;
-
-          default:
-            type = "data";
-            break;
-        }*/
-
-        if (i === 0) {
-          atsNode.columns.push({
+        // Creating AST
+        if (kValue === undefined) {
+          AST.fields.push({
             name: field.value,
             value: vTarget[0]?.value,
           });
         } else {
           conditions.push({
             name: field.value,
-            value: vTarget[0]?.value,
+            value: vTarget[0]?.value || idTarget[0]?.value,
             before: kValue,
-            /*
-            type: type,
-            */
             newScope: scope,
           });
         }
@@ -583,11 +572,11 @@ export function parser(VALUE) {
         console.log(conditions);
 
         if (kTarget[0]?.value === "WHERE") {
-          atsNode.isCondition = true;
+          AST.isCondition = true;
         }
       });
 
-      atsNode.condition = conditions;
+      AST.condition = conditions;
       break;
 
     case "DLT":
@@ -603,5 +592,5 @@ export function parser(VALUE) {
   }
 
   console.log("Errors: ", errors);
-  console.log("AST", atsNode);
+  console.log("AST", AST);
 }
