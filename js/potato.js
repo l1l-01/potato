@@ -5,7 +5,6 @@ const KEYWORDS = {
   AND: "KEYWORD",
   OR: "KEYWORD",
   WHERE: "KEYWORD",
-  BETWEEN: "KEYWORD",
   ",": "KEYWORD",
 };
 
@@ -83,11 +82,15 @@ const ERROR_TYPES = {
     "ERROR(021): You are only allowed to use id (#1), field ($field) and value (:value) after the keyword AND: ",
   NOT_ALLOWED_AFTER_SCOPE:
     "ERROR(022): You are only allowed to use AND or OR or BETWEEN after the keyword ',': ",
+  ID_CANNOT_UPDATE: "ERROR(023): You are not allowed to update the ID ",
 };
+
+let errors = [];
 
 function lexer(VALUE) {
   if (VALUE.trim() == "") {
     errors.push(ERROR_TYPES.EMPTY_QUERY);
+    return null;
   }
 
   let tokens = [];
@@ -161,10 +164,10 @@ function lexer(VALUE) {
 }
 
 export function parser(VALUE) {
-  let errors = [];
-
   // Catch empty query
   const TOKENS = lexer(VALUE);
+
+  if (TOKENS === null) return null;
 
   let fields = [];
   let ids = [];
@@ -182,6 +185,7 @@ export function parser(VALUE) {
     fields: [],
     condition: [],
     isCondition: false,
+    all: true,
   };
 
   // Catch missing CRUD operator && Detect multiple CRUD operations used simultaneously
@@ -537,8 +541,6 @@ export function parser(VALUE) {
             id?.position === field?.position + 2,
         );
 
-        // Todo: handle BETWEEN
-        // Todo: handle ALL
         // Todo: handle id update case
 
         // Getting keyword before the field
@@ -556,6 +558,11 @@ export function parser(VALUE) {
 
         // Creating AST
         if (kValue === undefined) {
+          if (field.value === "id" || vTarget[0]?.value === "IDENTIFICATION") {
+            const error = `${ERROR_TYPES.ID_CANNOT_UPDATE} ${vTarget[0]?.value} at position ${vTarget[0]?.position}`;
+            errors.push(error);
+          }
+
           AST.fields.push({
             name: field.value,
             value: vTarget[0]?.value,
@@ -569,10 +576,9 @@ export function parser(VALUE) {
           });
         }
 
-        console.log(conditions);
-
         if (kTarget[0]?.value === "WHERE") {
           AST.isCondition = true;
+          AST.all = false;
         }
       });
 
