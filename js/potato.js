@@ -73,7 +73,7 @@ const ERROR_TYPES = {
   MISSING_DATATYPE: "ERROR(016): Missing datatype(s).",
   MISPLACED_DATATYPE: "ERROR(017): Datatype must appear after its field: ",
   MISPLACED_VALUE:
-    "ERROR(018): Value must appear after its field or after its field's datatype: ",
+    "ERROR(018): Value must appear after its field, its field's datatype, or an operator: ",
   DATATYPES_NOT_ALLOWED: "ERROR(018): Datatype(s) not allowed: ",
   REPEATED_WHERE: "ERROR(019): You can only use one WHERE keyword: ",
   UNDEFINED_AND_STATE:
@@ -541,8 +541,6 @@ export function parser(VALUE) {
             id?.position === field?.position + 2,
         );
 
-        // Todo: handle id update case
-
         // Getting keyword before the field
         const kTarget = keywords.filter(
           (key) => key?.position === field?.position - 1,
@@ -551,18 +549,27 @@ export function parser(VALUE) {
         // Getting SCOPE keyword if it exist
         const ScopeTarget = keywords.filter((key) => key?.value === ",");
 
+        // Getting value
         const kValue =
-          kTarget[0]?.value !== "WHERE" ? kTarget[0]?.value : "condition";
+          kTarget[0]?.value !== "WHERE" ? kTarget[0]?.value : "START";
 
         const scope = ScopeTarget[0]?.position === kTarget[0]?.position - 1;
 
-        // Creating AST
+        // Getting operator
+        const opTarget = operators.filter(
+          (op) => op?.position === field?.position + 1,
+        );
+
+        console.log(opTarget);
+
+        // Catching when id is getting updated
         if (kValue === undefined) {
           if (field.value === "id" || vTarget[0]?.value === "IDENTIFICATION") {
             const error = `${ERROR_TYPES.ID_CANNOT_UPDATE} ${vTarget[0]?.value} at position ${vTarget[0]?.position}`;
             errors.push(error);
           }
 
+          // Creating AST
           AST.fields.push({
             name: field.value,
             value: vTarget[0]?.value,
@@ -573,9 +580,11 @@ export function parser(VALUE) {
             value: vTarget[0]?.value || idTarget[0]?.value,
             before: kValue,
             newScope: scope,
+            operator: opTarget[0]?.value,
           });
         }
 
+        // Set isCondition as true when the query has a condition, set all as false when the query does not targets all columns
         if (kTarget[0]?.value === "WHERE") {
           AST.isCondition = true;
           AST.all = false;
