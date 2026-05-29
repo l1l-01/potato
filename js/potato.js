@@ -1,7 +1,6 @@
 const KEYWORDS = {
   ASEC: "KEYWORD",
   DESC: "KEYWORD",
-  ALL: "KEYWORD",
   AND: "KEYWORD",
   OR: "KEYWORD",
   WHERE: "KEYWORD",
@@ -63,10 +62,11 @@ const ERROR_TYPES = {
   ID_NOT_NEEDED:
     "ERROR(009): ID is created automatically, remove the provided id: ",
   LIMIT_UNUSABLE: "ERROR(010): Limit can only be used in a GET query: ",
-  OPERATOR_UNUSABLE: "ERROR(011): Operators can only be used in a GET query: ",
+  OPERATOR_UNUSABLE:
+    "ERROR(011): Operators can only be used in a GET and UPD queries: ",
   FUNCTION_UNUSABLE: "ERROR(012): Functions can only be used in a GET query: ",
   KEYWORD_UNUSABLE:
-    "ERROR(013): Keywords can only be used in a GET and update query: ",
+    "ERROR(013): Keywords can only be used in a GET and UPD queries: ",
   MISSING_FIELD_DATATYPE:
     "ERROR(014): Fields and their types are required to create a table.",
   MISSING_FIELD: "ERROR(015): Missing field(s).",
@@ -83,6 +83,9 @@ const ERROR_TYPES = {
   NOT_ALLOWED_AFTER_SCOPE:
     "ERROR(022): You are only allowed to use AND or OR or BETWEEN after the keyword ',': ",
   ID_CANNOT_UPDATE: "ERROR(023): You are not allowed to update the ID ",
+  FIELD_NOT_ALLOWED:
+    "ERROR(024): You are only allwoed to use fields in LET, GET, UPD and DLT queries: ",
+  ID_CAN_NOT_USED: "ERROR(024): You are not allwoed to use ids in DROP query: ",
 };
 
 let errors = [];
@@ -159,7 +162,6 @@ function lexer(VALUE) {
     }
   });
 
-  console.log(tokens);
   return tokens;
 }
 
@@ -216,9 +218,7 @@ export function parser(VALUE) {
   const TABLES = TOKENS.filter((token) => token.type == "TABLE");
   const TABLES_LENGTH = TABLES.length;
 
-  if (TABLES_LENGTH === 0) {
-    errors.push(ERROR_TYPES.MISSING_TABLE);
-  } else if (TABLES_LENGTH > 1) {
+  if (TABLES_LENGTH > 1) {
     let tables = "";
     TABLES.forEach((action, i) => {
       tables += `${action.value} at position ${action.position}${ACTIONS_LENGTH == i + 1 ? ", " : "."}`;
@@ -380,11 +380,6 @@ export function parser(VALUE) {
     }
   });
 
-  if (errors.length > 0) {
-    console.log(errors);
-    return errors;
-  }
-
   const IDS_LENGTH = ids.length;
   const LIMITS_LENGTH = limits.length;
   const OPERATORS_LENGTH = operators.length;
@@ -396,6 +391,11 @@ export function parser(VALUE) {
 
   switch (AST.action) {
     case "LET":
+      // Catching missing table
+      if (TABLES_LENGTH === 0) {
+        errors.push(ERROR_TYPES.MISSING_TABLE);
+      }
+
       // Catching when ID is created manually
       if (IDS_LENGTH !== 0) {
         let idsInfo = "";
@@ -491,6 +491,11 @@ export function parser(VALUE) {
       break;
 
     case "UPD":
+      // Catching missing table
+      if (TABLES_LENGTH === 0) {
+        errors.push(ERROR_TYPES.MISSING_TABLE);
+      }
+
       // Catching when FUNCTIONS are used on a LET query
       if (FUNCTIONS_LENGTH !== 0) {
         let funcsInfo = "";
@@ -560,8 +565,6 @@ export function parser(VALUE) {
           (op) => op?.position === field?.position + 1,
         );
 
-        console.log(opTarget);
-
         // Catching when id is getting updated
         if (kValue === undefined) {
           if (field.value === "id" || vTarget[0]?.value === "IDENTIFICATION") {
@@ -598,6 +601,81 @@ export function parser(VALUE) {
       break;
 
     case "DROP":
+      // Catching when functions are used on a DROP query
+      if (FUNCTIONS_LENGTH !== 0) {
+        let funcsInfo = "";
+        functions.forEach((func, i) => {
+          funcsInfo += `${func.value} at position ${func.position}${FUNCTIONS_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.FUNCTION_UNUSABLE} ${funcsInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when DATATYPES are used on a DROP query
+      if (DATATYPES_LENGTH !== 0) {
+        let typesInfo = "";
+        datatypes.forEach((type, i) => {
+          typesInfo += `${type.value} at position ${type.position}${DATATYPES_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.DATATYPES_NOT_ALLOWED} ${typesInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when limit is used on a DROP query
+      if (LIMITS_LENGTH !== 0) {
+        let limitsInfo = "";
+        limits.forEach((limit, i) => {
+          limitsInfo += `@${limit.value} at position ${limit.position}${LIMITS_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.LIMIT_UNUSABLE} ${limitsInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when operators are used on a DROP query
+      if (OPERATORS_LENGTH !== 0) {
+        let operatorsInfo = "";
+        operators.forEach((operator, i) => {
+          operatorsInfo += `${operator.value} at position ${operator.position}${OPERATORS_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.OPERATOR_UNUSABLE} ${operatorsInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when keywords are used on a DROP query
+      if (KEYWORDS_LENGTH !== 0) {
+        let keywordsInfo = "";
+        keywords.forEach((keyword, i) => {
+          keywordsInfo += `${keyword.value} at position ${keyword.position}${KEYWORDS_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.KEYWORD_UNUSABLE} ${keywordsInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when keywords are used on a DROP query
+      if (FIELDS_LENGTH !== 0) {
+        let fieldInfo = "";
+        fields.forEach((field, i) => {
+          fieldInfo += `${field.value} at position ${field.position}${FIELDS_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.FIELD_NOT_ALLOWED} ${fieldInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when IDs are used on a DROP query
+      if (IDS_LENGTH !== 0) {
+        let idsInfo = "";
+        ids.forEach((id, i) => {
+          idsInfo += `#${id.value} at position ${id.position}${IDS_LENGTH == i + 1 ? ", " : "."}`;
+        });
+        const error = `${ERROR_TYPES.ID_CAN_NOT_USED} ${idsInfo}`;
+        errors.push(error);
+      }
+
+      // Catching missing table
+      if (TABLES_LENGTH !== 0) {
+        AST.table = TABLES[0]?.value;
+        AST.all = false;
+      }
       break;
 
     default:
