@@ -390,7 +390,7 @@ export function parser(VALUE) {
   const FIELDS_LENGTH = fields.length;
 
   switch (AST.action) {
-    case "LET":
+    case "LET": {
       // Catching missing table
       if (TABLES_LENGTH === 0) {
         errors.push(ERROR_TYPES.MISSING_TABLE);
@@ -486,11 +486,12 @@ export function parser(VALUE) {
       }
 
       break;
+    }
 
     case "GET":
       break;
 
-    case "UPD":
+    case "UPD": {
       // Catching missing table
       if (TABLES_LENGTH === 0) {
         errors.push(ERROR_TYPES.MISSING_TABLE);
@@ -596,11 +597,55 @@ export function parser(VALUE) {
 
       AST.condition = conditions;
       break;
+    }
 
-    case "DLT":
+    case "DLT": {
+      // Catching missing table
+      if (TABLES_LENGTH === 0) {
+        errors.push(ERROR_TYPES.MISSING_TABLE);
+      }
+
+      // Catching when FUNCTIONS are used on a LET query
+      if (FUNCTIONS_LENGTH !== 0) {
+        let funcsInfo = "";
+        functions.forEach((func, i) => {
+          funcsInfo += `${func.value} at position ${func.position}${FUNCTIONS_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.FUNCTION_UNUSABLE} ${funcsInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when DATATYPES are used on a LET query
+      if (DATATYPES_LENGTH !== 0) {
+        let typesInfo = "";
+        datatypes.forEach((type, i) => {
+          typesInfo += `${type.value} at position ${type.position}${DATATYPES_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.DATATYPES_NOT_ALLOWED} ${typesInfo}`;
+        errors.push(error);
+      }
+
+      // Catching duplicated WHERE keyword in an UPD query
+      const WHERE_KEYWORDS = keywords.filter((key) => key?.value === "WHERE");
+      const WHERE_LENGTH = WHERE_KEYWORDS.length;
+
+      if (WHERE_LENGTH > 1) {
+        let whereInfo = "";
+        WHERE_KEYWORDS.forEach((key, i) => {
+          whereInfo += `${key.value} at position ${key.position}${WHERE_LENGTH.length == i + 1 ? "." : ","}`;
+        });
+
+        const error = `${ERROR_TYPES.REPEATED_WHERE} ${whereInfo}`;
+        errors.push(error);
+      }
+
+      console.log("WHERE: ", WHERE_KEYWORDS);
+      console.log("TOKENS: ", TOKENS.slice(WHERE_KEYWORDS[0]?.position));
+
       break;
+    }
 
-    case "DROP":
+    case "DROP": {
       // Catching when functions are used on a DROP query
       if (FUNCTIONS_LENGTH !== 0) {
         let funcsInfo = "";
@@ -677,6 +722,7 @@ export function parser(VALUE) {
         AST.all = false;
       }
       break;
+    }
 
     default:
       errors.push(ERROR_TYPES.MISSING_CRUD_OPERATION);
