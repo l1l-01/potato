@@ -396,6 +396,8 @@ export function parser(VALUE) {
         errors.push(ERROR_TYPES.MISSING_TABLE);
       }
 
+      AST.all = false;
+
       // Catching when ID is created manually
       if (IDS_LENGTH !== 0) {
         let idsInfo = "";
@@ -639,9 +641,48 @@ export function parser(VALUE) {
         errors.push(error);
       }
 
-      console.log("WHERE: ", WHERE_KEYWORDS);
-      console.log("TOKENS: ", TOKENS.slice(WHERE_KEYWORDS[0]?.position));
+      let conditions = [];
 
+      const CONDITIONS_TOKENS = TOKENS.slice(WHERE_KEYWORDS[0]?.position);
+      const IS_WHERE = WHERE_KEYWORDS[0].value ? true : false;
+
+      fields.forEach((field, i) => {
+        // Getting keyword before the field
+        const kTarget = keywords.filter(
+          (key) => key?.position === field?.position - 1,
+        );
+
+        // Getting operator
+        const opTarget = operators.filter(
+          (op) => op?.position === field?.position + 1,
+        );
+
+        // Getting value
+        const vTarget = values.filter(
+          (value) =>
+            value?.position === field?.position + 1 ||
+            value?.position === field?.position + 2,
+        );
+
+        // Getting new scope
+        const ScopeTarget = keywords.filter((key) => key?.value === ",");
+        const scope = ScopeTarget[0]?.position === kTarget[0]?.position - 1;
+
+        const cond = {
+          name: field.value,
+          value: vTarget[0]?.value,
+          before: kTarget[0]?.value,
+          newScope: scope,
+          operator: opTarget[0]?.value,
+        };
+        conditions.push(cond);
+      });
+
+      if (IS_WHERE) {
+        AST.all = false;
+      }
+
+      AST.condition = conditions;
       break;
     }
 
