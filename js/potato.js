@@ -21,7 +21,6 @@ const DATATYPES = {
   DEC: "DATATYPE",
   BOOL: "DATATYPE",
   DATE: "DATATYPE",
-  ENUM: "DATATYPE",
 };
 
 const PREFIXES = {
@@ -452,8 +451,76 @@ export function parser(VALUE) {
       break;
     }
 
-    case "GET":
+    case "GET": {
+      // Catching missing table
+      if (TABLES_LENGTH === 0) {
+        errors.push(ERROR_TYPES.MISSING_TABLE);
+      }
+
+      // Setting table
+      AST.table = TABLES[0]?.value;
+
+      // Catching duplicated WHERE keyword in an UPD query
+      const WHERE_KEYWORDS = keywords.filter((key) => key?.value === "WHERE");
+      const WHERE_LENGTH = WHERE_KEYWORDS.length;
+
+      if (WHERE_LENGTH > 1) {
+        let whereInfo = "";
+        WHERE_KEYWORDS.forEach((key, i) => {
+          whereInfo += `${key.value} at position ${key.position}${WHERE_LENGTH.length == i + 1 ? "." : ","}`;
+        });
+
+        const error = `${ERROR_TYPES.REPEATED_WHERE} ${whereInfo}`;
+        errors.push(error);
+      }
+
+      let conditions = [];
+
+      const CONDITIONS_TOKENS = TOKENS.slice(WHERE_KEYWORDS[0]?.position);
+      const IS_WHERE = WHERE_KEYWORDS[0]?.value ? true : false;
+
+      if (FIELDS_LENGTH > 0) {
+        fields.forEach((field, i) => {
+          // Getting keyword before the field
+          const kTarget = keywords.filter(
+            (key) => key?.position === field?.position - 1,
+          );
+
+          // Getting operator
+          const opTarget = operators.filter(
+            (op) => op?.position === field?.position + 1,
+          );
+
+          // Getting value
+          const vTarget = values.filter(
+            (value) =>
+              value?.position === field?.position + 1 ||
+              value?.position === field?.position + 2,
+          );
+
+          // Getting new scope
+          const ScopeTarget = keywords.filter((key) => key?.value === ",");
+          const scope = ScopeTarget[0]?.position === kTarget[0]?.position - 1;
+
+          const cond = {
+            name: field.value,
+            value: vTarget[0]?.value,
+            before: kTarget[0]?.value,
+            newScope: scope,
+            operator: opTarget[0]?.value,
+          };
+          conditions.push(cond);
+        });
+      }
+
+      if (IS_WHERE) {
+        AST.all = false;
+      }
+
+      AST.condition = conditions;
+
       break;
+    }
 
     case "UPD": {
       // Catching missing table
@@ -586,39 +653,41 @@ export function parser(VALUE) {
       let conditions = [];
 
       const CONDITIONS_TOKENS = TOKENS.slice(WHERE_KEYWORDS[0]?.position);
-      const IS_WHERE = WHERE_KEYWORDS[0].value ? true : false;
+      const IS_WHERE = WHERE_KEYWORDS[0]?.value ? true : false;
 
-      fields.forEach((field, i) => {
-        // Getting keyword before the field
-        const kTarget = keywords.filter(
-          (key) => key?.position === field?.position - 1,
-        );
+      if (FIELDS_LENGTH > 0) {
+        fields.forEach((field, i) => {
+          // Getting keyword before the field
+          const kTarget = keywords.filter(
+            (key) => key?.position === field?.position - 1,
+          );
 
-        // Getting operator
-        const opTarget = operators.filter(
-          (op) => op?.position === field?.position + 1,
-        );
+          // Getting operator
+          const opTarget = operators.filter(
+            (op) => op?.position === field?.position + 1,
+          );
 
-        // Getting value
-        const vTarget = values.filter(
-          (value) =>
-            value?.position === field?.position + 1 ||
-            value?.position === field?.position + 2,
-        );
+          // Getting value
+          const vTarget = values.filter(
+            (value) =>
+              value?.position === field?.position + 1 ||
+              value?.position === field?.position + 2,
+          );
 
-        // Getting new scope
-        const ScopeTarget = keywords.filter((key) => key?.value === ",");
-        const scope = ScopeTarget[0]?.position === kTarget[0]?.position - 1;
+          // Getting new scope
+          const ScopeTarget = keywords.filter((key) => key?.value === ",");
+          const scope = ScopeTarget[0]?.position === kTarget[0]?.position - 1;
 
-        const cond = {
-          name: field.value,
-          value: vTarget[0]?.value,
-          before: kTarget[0]?.value,
-          newScope: scope,
-          operator: opTarget[0]?.value,
-        };
-        conditions.push(cond);
-      });
+          const cond = {
+            name: field.value,
+            value: vTarget[0]?.value,
+            before: kTarget[0]?.value,
+            newScope: scope,
+            operator: opTarget[0]?.value,
+          };
+          conditions.push(cond);
+        });
+      }
 
       if (IS_WHERE) {
         AST.all = false;
