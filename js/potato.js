@@ -31,12 +31,6 @@ const PREFIXES = {
   $: "FIELD",
 };
 
-const FUNCTIONS = {
-  SUM: "FUNCTION",
-  AVG: "FUNCTION",
-  COUNT: "FUNCTION",
-};
-
 const OPERATORS = {
   "!": "OPERATOR",
   ">=": "OPERATOR",
@@ -64,7 +58,6 @@ const ERROR_TYPES = {
   LIMIT_UNUSABLE: "ERROR(010): Limit can only be used in a GET query: ",
   OPERATOR_UNUSABLE:
     "ERROR(011): Operators can only be used in a GET and UPD queries: ",
-  FUNCTION_UNUSABLE: "ERROR(012): Functions can only be used in a GET query: ",
   KEYWORD_UNUSABLE:
     "ERROR(013): Keywords can only be used in a GET and UPD queries: ",
   MISSING_FIELD_DATATYPE:
@@ -137,13 +130,6 @@ function lexer(VALUE) {
           }
         }
 
-        for (let key in FUNCTIONS) {
-          if (word.includes(key)) {
-            type = FUNCTIONS[key];
-            word = word;
-          }
-        }
-
         if (type !== type.toUpperCase()) {
           tokens.push({ type: "TABLE", value: word, position: i });
         } else {
@@ -178,7 +164,6 @@ export function parser(VALUE) {
   let keywords = [];
   let datatypes = [];
   let operators = [];
-  let functions = [];
 
   const AST = {
     action: "",
@@ -361,18 +346,6 @@ export function parser(VALUE) {
         }
         break;
 
-      case "FUNCTION":
-        for (let keyword in FUNCTIONS) {
-          if (keyword === token.value) {
-            functions.push({
-              type: token.type,
-              value: token.value,
-              position: wordPosition,
-            });
-          }
-        }
-        break;
-
       default:
         const error = `${ERROR_TYPES.UNKOWN_KEYWORD} ${token.value} at postition ${wordPosition}`;
         errors.push(error);
@@ -384,7 +357,6 @@ export function parser(VALUE) {
   const LIMITS_LENGTH = limits.length;
   const OPERATORS_LENGTH = operators.length;
   const KEYWORDS_LENGTH = keywords.length;
-  const FUNCTIONS_LENGTH = functions.length;
   const DATATYPES_LENGTH = datatypes.length;
   const VALUE_LENGTH = values.length;
   const FIELDS_LENGTH = fields.length;
@@ -425,16 +397,6 @@ export function parser(VALUE) {
           operatorsInfo += `${operator.value} at position ${operator.position}${OPERATORS_LENGTH == i + 1 ? "." : ","}`;
         });
         const error = `${ERROR_TYPES.OPERATOR_UNUSABLE} ${operatorsInfo}`;
-        errors.push(error);
-      }
-
-      // Catching when functions are used on a LET query
-      if (FUNCTIONS_LENGTH !== 0) {
-        let funcsInfo = "";
-        functions.forEach((func, i) => {
-          funcsInfo += `${func.value} at position ${func.position}${FUNCTIONS_LENGTH == i + 1 ? "." : ","}`;
-        });
-        const error = `${ERROR_TYPES.FUNCTION_UNUSABLE} ${funcsInfo}`;
         errors.push(error);
       }
 
@@ -497,16 +459,6 @@ export function parser(VALUE) {
       // Catching missing table
       if (TABLES_LENGTH === 0) {
         errors.push(ERROR_TYPES.MISSING_TABLE);
-      }
-
-      // Catching when FUNCTIONS are used on a LET query
-      if (FUNCTIONS_LENGTH !== 0) {
-        let funcsInfo = "";
-        functions.forEach((func, i) => {
-          funcsInfo += `${func.value} at position ${func.position}${FUNCTIONS_LENGTH == i + 1 ? "." : ","}`;
-        });
-        const error = `${ERROR_TYPES.FUNCTION_UNUSABLE} ${funcsInfo}`;
-        errors.push(error);
       }
 
       // Catching when DATATYPES are used on a LET query
@@ -607,16 +559,6 @@ export function parser(VALUE) {
         errors.push(ERROR_TYPES.MISSING_TABLE);
       }
 
-      // Catching when FUNCTIONS are used on a LET query
-      if (FUNCTIONS_LENGTH !== 0) {
-        let funcsInfo = "";
-        functions.forEach((func, i) => {
-          funcsInfo += `${func.value} at position ${func.position}${FUNCTIONS_LENGTH == i + 1 ? "." : ","}`;
-        });
-        const error = `${ERROR_TYPES.FUNCTION_UNUSABLE} ${funcsInfo}`;
-        errors.push(error);
-      }
-
       // Catching when DATATYPES are used on a LET query
       if (DATATYPES_LENGTH !== 0) {
         let typesInfo = "";
@@ -687,16 +629,6 @@ export function parser(VALUE) {
     }
 
     case "DROP": {
-      // Catching when functions are used on a DROP query
-      if (FUNCTIONS_LENGTH !== 0) {
-        let funcsInfo = "";
-        functions.forEach((func, i) => {
-          funcsInfo += `${func.value} at position ${func.position}${FUNCTIONS_LENGTH == i + 1 ? "." : ","}`;
-        });
-        const error = `${ERROR_TYPES.FUNCTION_UNUSABLE} ${funcsInfo}`;
-        errors.push(error);
-      }
-
       // Catching when DATATYPES are used on a DROP query
       if (DATATYPES_LENGTH !== 0) {
         let typesInfo = "";
