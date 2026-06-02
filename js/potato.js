@@ -1,5 +1,4 @@
 const KEYWORDS = {
-  ASEC: "KEYWORD",
   DESC: "KEYWORD",
   AND: "KEYWORD",
   OR: "KEYWORD",
@@ -58,14 +57,14 @@ const ERROR_TYPES = {
   OPERATOR_UNUSABLE:
     "ERROR(011): Operators can only be used in a GET and UPD queries: ",
   KEYWORD_UNUSABLE:
-    "ERROR(013): Keywords can only be used in a GET and UPD queries: ",
+    "ERROR(012): Keywords can only be used in a GET and UPD queries: ",
   MISSING_FIELD_DATATYPE:
-    "ERROR(014): Fields and their types are required to create a table.",
-  MISSING_FIELD: "ERROR(015): Missing field(s).",
-  MISSING_DATATYPE: "ERROR(016): Missing datatype(s).",
-  MISPLACED_DATATYPE: "ERROR(017): Datatype must appear after its field: ",
+    "ERROR(013): Fields and their types are required to create a table.",
+  MISSING_FIELD: "ERROR(014): Missing field(s).",
+  MISSING_DATATYPE: "ERROR(015): Missing datatype(s).",
+  MISPLACED_DATATYPE: "ERROR(016): Datatype must appear after its field: ",
   MISPLACED_VALUE:
-    "ERROR(018): Value must appear after its field, its field's datatype, or an operator: ",
+    "ERROR(017): Value must appear after its field, its field's datatype, or an operator: ",
   DATATYPES_NOT_ALLOWED: "ERROR(018): Datatype(s) not allowed: ",
   REPEATED_WHERE: "ERROR(019): You can only use one WHERE keyword: ",
   UNDEFINED_AND_STATE:
@@ -78,6 +77,7 @@ const ERROR_TYPES = {
   FIELD_NOT_ALLOWED:
     "ERROR(024): You are only allwoed to use fields in LET, GET, UPD and DLT queries: ",
   ID_CAN_NOT_USED: "ERROR(024): You are not allwoed to use ids in DROP query: ",
+  DUPLICATED_DESC: "ERROR(025): Duplicated DESC: ",
 };
 
 let errors = [];
@@ -172,6 +172,8 @@ export function parser(VALUE) {
     condition: [],
     isCondition: false,
     all: true,
+    limit: undefined,
+    order: undefined,
   };
 
   // Catch missing CRUD operator && Detect multiple CRUD operations used simultaneously
@@ -516,6 +518,24 @@ export function parser(VALUE) {
       if (IS_WHERE) {
         AST.all = false;
       }
+
+      if (limits[0]?.value !== undefined) AST.limit = limits[0]?.value;
+
+      const DESC_KEYWORDS = keywords.filter((key) => key?.value === "DESC");
+      const DESC_LENGTH = DESC_KEYWORDS.length;
+
+      if (DESC_LENGTH > 1) {
+        // Catching missing datatype(s)
+        let info = "";
+        DESC_KEYWORDS.forEach((key, i) => {
+          info += `${key?.value} at position ${key?.position} ${DESC_LENGTH == i + 1 ? "." : ", "}`;
+        });
+
+        const error = `${ERROR_TYPES.DUPLICATED_DESC} ${info}`;
+        errors.push(error);
+      }
+
+      if (DESC_KEYWORDS[0]?.value !== undefined) AST.order = "DESC";
 
       AST.condition = conditions;
 
