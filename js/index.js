@@ -1,4 +1,4 @@
-import { parser } from "./potato.js";
+import { potato } from "./potato.js";
 
 function getById(id) {
   return document.querySelector(id);
@@ -13,5 +13,5 @@ const BTN = getById("#btn");
 
 addEvent(BTN, "click", () => {
   let VALUE = INPUT.value;
-  parser(VALUE);
+  potato(VALUE);
 });

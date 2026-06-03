@@ -150,7 +150,7 @@ function lexer(VALUE) {
   return tokens;
 }
 
-export function parser(VALUE) {
+function parser(VALUE) {
   // Catch empty query
   const TOKENS = lexer(VALUE);
 
@@ -794,4 +794,45 @@ export function parser(VALUE) {
 
   console.log("Errors: ", errors);
   console.log("AST", AST);
+  return AST;
+}
+
+export function storage(AST) {
+  const dbName = "app";
+  const request = indexedDB.open(dbName, 1);
+
+  request.onerror = (e) => {
+    console.log("Error opening database: ", dbName, e);
+  };
+
+  return {
+    create() {
+      console.log("Columns", AST.columns);
+
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+
+        const objectStore = db.createObjectStore(AST.table, {
+          keyPath: "id",
+        });
+
+        objectStore.add({ metadata: AST.columns, id: 0 });
+
+        console.log("Database was created successfully!");
+      };
+    },
+  };
+}
+
+export function potato(VALUE) {
+  const AST = parser(VALUE);
+
+  switch (AST.action) {
+    case "LET":
+      storage(AST).create();
+      break;
+
+    default:
+      break;
+  }
 }
