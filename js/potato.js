@@ -8,6 +8,7 @@ const KEYWORDS = {
 
 const ACTIONS = {
   LET: "ACTION",
+  POST: "ACTION",
   GET: "ACTION",
   UPD: "ACTION",
   DLT: "ACTION",
@@ -41,7 +42,7 @@ const ERROR_TYPES = {
   EMPTY_QUERY: "ERROR(000): Your query is empty.",
   UNKOWN_KEYWORD: "ERROR(001): UNKNOWN KEYWORD: ",
   CRUD_KEYWORD:
-    "Error(002): Missing CRUD keyword. An action must be specified. Use one of: LET, GET, UPD, DLT.",
+    "Error(002): Missing CRUD keyword. An action must be specified. Use one of: LET, POST, GET, UPD, DLT.",
   CRUD_OPERATIONS:
     "Error(003): Only one CRUD operation can run at a time. You are trying to use more than one: ",
   CRUD_KEYWORD_MISPLACED: "ERROR(004): Misplaced CRUD keyword: ",
@@ -60,24 +61,27 @@ const ERROR_TYPES = {
     "ERROR(012): Keywords can only be used in a GET and UPD queries: ",
   MISSING_FIELD_DATATYPE:
     "ERROR(013): Fields and their types are required to create a table.",
-  MISSING_FIELD: "ERROR(014): Missing field(s).",
-  MISSING_DATATYPE: "ERROR(015): Missing datatype(s).",
-  MISPLACED_DATATYPE: "ERROR(016): Datatype must appear after its field: ",
+  MISSING_FIELD_VALUE:
+    "ERROR(014): Fields and their values are required to create a table.",
+  MISSING_FIELD: "ERROR(015): Missing field(s).",
+  MISSING_DATATYPE: "ERROR(016): Missing datatype(s).",
+  MISSING_VALUE: "ERROR(017): Missing value(s).",
+  MISPLACED_DATATYPE: "ERROR(018): Datatype must appear after its field: ",
   MISPLACED_VALUE:
-    "ERROR(017): Value must appear after its field, its field's datatype, or an operator: ",
-  DATATYPES_NOT_ALLOWED: "ERROR(018): Datatype(s) not allowed: ",
-  REPEATED_WHERE: "ERROR(019): You can only use one WHERE keyword: ",
+    "ERROR(019): Value must appear after its field, its field's datatype, or an operator: ",
+  DATATYPES_NOT_ALLOWED: "ERROR(020): Datatype(s) not allowed: ",
+  REPEATED_WHERE: "ERROR(021): You can only use one WHERE keyword: ",
   UNDEFINED_AND_STATE:
-    "ERROR(020): You can't use the AND keyword at the end of the query, ",
+    "ERROR(022): You can't use the AND keyword at the end of the query, ",
   NOT_ALLOWED_AFTER_AND:
-    "ERROR(021): You are only allowed to use id (#1), field ($field) and value (:value) after the keyword AND: ",
+    "ERROR(023): You are only allowed to use id (#1), field ($field) and value (:value) after the keyword AND: ",
   NOT_ALLOWED_AFTER_SCOPE:
-    "ERROR(022): You are only allowed to use AND or OR or BETWEEN after the keyword ',': ",
-  ID_CANNOT_UPDATE: "ERROR(023): You are not allowed to update the ID ",
+    "ERROR(024): You are only allowed to use AND or OR or BETWEEN after the keyword ',': ",
+  ID_CANNOT_UPDATE: "ERROR(024): You are not allowed to update the ID ",
   FIELD_NOT_ALLOWED:
-    "ERROR(024): You are only allwoed to use fields in LET, GET, UPD and DLT queries: ",
-  ID_CAN_NOT_USED: "ERROR(024): You are not allwoed to use ids in DROP query: ",
-  DUPLICATED_DESC: "ERROR(025): Duplicated DESC: ",
+    "ERROR(025): You are only allwoed to use fields in LET, GET, UPD and DLT queries: ",
+  ID_CAN_NOT_USED: "ERROR(026): You are not allwoed to use ids in DROP query: ",
+  DUPLICATED_DESC: "ERROR(027): Duplicated DESC: ",
 };
 
 let errors = [];
@@ -181,6 +185,7 @@ function parser(VALUE) {
     TOKENS.filter(
       (token) =>
         token.value == "LET" ||
+        token.value == "POST" ||
         token.value == "GET" ||
         token.value == "UPD" ||
         token.value == "DLT" ||
@@ -448,6 +453,105 @@ function parser(VALUE) {
         errors.push(error);
       } else if (DATATYPES_LENGTH === 0 && FIELDS_LENGTH === 0) {
         errors.push(ERROR_TYPES.MISSING_FIELD_DATATYPE);
+      }
+
+      break;
+    }
+
+    case "POST": {
+      // Catching missing table
+      if (TABLES_LENGTH === 0) {
+        errors.push(ERROR_TYPES.MISSING_TABLE);
+      }
+
+      AST.all = false;
+
+      // Catching when ID is created manually
+      if (IDS_LENGTH !== 0) {
+        let idsInfo = "";
+        ids.forEach((id, i) => {
+          idsInfo += `#${id.value} at position ${id.position}${IDS_LENGTH == i + 1 ? ", " : "."}`;
+        });
+        const error = `${ERROR_TYPES.ID_NOT_NEEDED} ${idsInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when limit is used on a LET query
+      if (LIMITS_LENGTH !== 0) {
+        let limitsInfo = "";
+        limits.forEach((limit, i) => {
+          limitsInfo += `@${limit.value} at position ${limit.position}${LIMITS_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.LIMIT_UNUSABLE} ${limitsInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when operators are used on a POST query
+      if (OPERATORS_LENGTH !== 0) {
+        let operatorsInfo = "";
+        operators.forEach((operator, i) => {
+          operatorsInfo += `${operator.value} at position ${operator.position}${OPERATORS_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.OPERATOR_UNUSABLE} ${operatorsInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when keywords are used on a POST query
+      if (KEYWORDS_LENGTH !== 0) {
+        let keywordsInfo = "";
+        keywords.forEach((keyword, i) => {
+          keywordsInfo += `${keyword.value} at position ${keyword.position}${KEYWORDS_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.KEYWORD_UNUSABLE} ${keywordsInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when DATATYPES are used on a POST query
+      if (DATATYPES_LENGTH !== 0) {
+        let typesInfo = "";
+        datatypes.forEach((type, i) => {
+          typesInfo += `${type.value} at position ${type.position}${DATATYPES_LENGTH == i + 1 ? "." : ","}`;
+        });
+        const error = `${ERROR_TYPES.DATATYPES_NOT_ALLOWED} ${typesInfo}`;
+        errors.push(error);
+      }
+
+      // Catching when DATATYPES_LENGTH is different than FIELDS_LENGTH in a POST query
+      if (VALUE_LENGTH === FIELDS_LENGTH) {
+        // Creating columns
+        fields.forEach((field, i) => {
+          const target = values.filter(
+            (value) => value?.position === field?.position + 1,
+          );
+          AST.columns.push({
+            name: field.value,
+            value: target[0]?.value,
+          });
+        });
+      } else if (VALUE_LENGTH > FIELDS_LENGTH) {
+        // Catching missing field(s)
+        let info = "";
+        datatypes.forEach((type, i) => {
+          if (fields[i]?.value === undefined) {
+            info += `${type?.value} at position ${type?.position} doesn't relate to any field. `;
+          }
+        });
+
+        const error = `${ERROR_TYPES.MISSING_VALUE} ${info}`;
+        errors.push(error);
+      } else if (VALUE_LENGTH < FIELDS_LENGTH) {
+        // Catching missing datatype(s)
+        let info = "";
+        fields.forEach((field, i) => {
+          if (datatypes[i]?.value === undefined) {
+            info += `$${field?.value} at position ${field?.position} doesn't relate to any field. `;
+          }
+        });
+
+        const error = `${ERROR_TYPES.MISSING_VALUE} ${info}`;
+        errors.push(error);
+      } else if (DATATYPES_LENGTH === 0 && FIELDS_LENGTH === 0) {
+        errors.push(ERROR_TYPES.MISSING_FIELD_VALUE);
       }
 
       break;
@@ -818,7 +922,7 @@ export function storage(AST) {
 
         objectStore.add({ metadata: AST.columns, id: 0 });
 
-        console.log("Database was created successfully!");
+        console.log(AST.table, " was created successfully!");
       };
     },
   };
