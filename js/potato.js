@@ -82,6 +82,8 @@ const ERROR_TYPES = {
     "ERROR(025): You are only allwoed to use fields in LET, GET, UPD and DLT queries: ",
   ID_CAN_NOT_USED: "ERROR(026): You are not allwoed to use ids in DROP query: ",
   DUPLICATED_DESC: "ERROR(027): Duplicated DESC: ",
+  TABLE_EXISTS:
+    "ERROR(028): You can only create one table at a time; please delete the current table before creating a new one: ",
 };
 
 let errors = [];
@@ -902,6 +904,7 @@ function parser(VALUE) {
 }
 
 export function storage(AST) {
+  // Create DB
   const dbName = "app";
   const request = indexedDB.open(dbName, 1);
 
@@ -910,9 +913,19 @@ export function storage(AST) {
   };
 
   return {
-    create() {
-      console.log("Columns", AST.columns);
+    async create() {
+      // Handle attempts to create a second table
+      indexedDB.open("app");
+      request.onsuccess = (event) => {
+        const db = event.target.result;
+        const storeNames = db.objectStoreNames;
+        if (storeNames[0] !== undefined && storeNames[0].trim() !== "") {
+          const error = `${ERROR_TYPES.TABLE_EXISTS} old table: ${storeNames[0]}, new table: ${AST.table}.`;
+          errors.push(error);
+        }
+      };
 
+      // Create table
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
 
@@ -925,6 +938,11 @@ export function storage(AST) {
         console.log(AST.table, " was created successfully!");
       };
     },
+
+    post() {
+      const db = indexedDB.databases();
+      console.log(db);
+    },
   };
 }
 
@@ -932,11 +950,18 @@ export function potato(VALUE) {
   const AST = parser(VALUE);
 
   switch (AST.action) {
-    case "LET":
+    case "LET": {
       storage(AST).create();
       break;
+    }
+
+    case "POST": {
+      storage(AST).post();
+      break;
+    }
 
     default:
       break;
   }
+  console.log("ERRORS: ", errors);
 }
