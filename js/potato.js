@@ -82,8 +82,11 @@ const ERROR_TYPES = {
     "ERROR(025): You are only allwoed to use fields in LET, GET, UPD and DLT queries: ",
   ID_CAN_NOT_USED: "ERROR(026): You are not allwoed to use ids in DROP query: ",
   DUPLICATED_DESC: "ERROR(027): Duplicated DESC: ",
+  OPENING_DB: "ERROR(028): Can't open database: ",
+  FAILED_DB: "ERROR(028): Database failed to open: ",
+  MISSING_METADATA: "ERROR(029): Missing meta deta from table: ",
   TABLE_EXISTS:
-    "ERROR(028): You can only create one table at a time; please delete the current table before creating a new one: ",
+    "ERROR(030): You can only create one table at a time; please delete the current table before creating a new one: ",
 };
 
 let errors = [];
@@ -898,22 +901,22 @@ function parser(VALUE) {
       break;
   }
 
-  console.log("Errors: ", errors);
-  console.log("AST", AST);
   return AST;
 }
 
 export function storage(AST) {
-  // Create DB
-  const dbName = "app";
-  const request = indexedDB.open(dbName, 1);
-
-  request.onerror = (e) => {
-    console.log("Error opening database: ", dbName, e);
-  };
-
   return {
-    async create() {
+    async let() {
+      // Create DB
+      const dbName = "app";
+      const request = indexedDB.open(dbName, 1);
+
+      request.onerror = (e) => {
+        const error = ERROR_TYPES.OPENING_DB + e;
+        errors.push(error);
+      };
+
+      let tableExist = false;
       // Handle attempts to create a second table
       indexedDB.open("app");
       request.onsuccess = (event) => {
@@ -922,46 +925,71 @@ export function storage(AST) {
         if (storeNames[0] !== undefined && storeNames[0].trim() !== "") {
           const error = `${ERROR_TYPES.TABLE_EXISTS} old table: ${storeNames[0]}, new table: ${AST.table}.`;
           errors.push(error);
+          tableExist = true;
         }
       };
 
-      // Create table
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
+      if (!tableExist) {
+        // Create table
+        request.onupgradeneeded = (event) => {
+          const db = event.target.result;
 
-        const objectStore = db.createObjectStore(AST.table, {
-          keyPath: "id",
-        });
+          const store = db.createObjectStore(AST.table, {
+            keyPath: "id",
+          });
 
-        objectStore.add({ metadata: AST.columns, id: 0 });
+          store.add({ metadata: AST.columns, id: 0 });
 
-        console.log(AST.table, " was created successfully!");
-      };
+          console.log(AST.table, " was created successfully!");
+        };
+      }
     },
 
     post() {
-      const db = indexedDB.databases();
-      console.log(db);
+      // Open the database
+      const db = indexedDB.open("app", 1);
+
+      db.onsuccess = function (event) {
+        // Grab the database instance from the success event
+        const db = event.target.result;
+
+        const transaction = db.transaction(AST.table, "readwrite");
+        const store = transaction.objectStore(AST.table);
+
+        const request = store.openCursor(null, "prev");
+
+        request.onsuccess = function (e) {
+          const cursor = e.target.result;
+
+          if (cursor) {
+            console.log("The latest key is:", cursor.key);
+
+            store.add({ id: cursor.key + 1, data: AST.columns });
+          } else {
+            const error = ERROR_TYPES.MISSING_METADATA + AST.table;
+            errors.push(error);
+          }
+        };
+      };
+
+      db.onerror = function (event) {
+        const error = ERROR_TYPES.FAILED_DB + event.target.error;
+        errors.push(error);
+      };
     },
   };
 }
 
 export function potato(VALUE) {
   const AST = parser(VALUE);
+  const action = AST.action;
 
-  switch (AST.action) {
-    case "LET": {
-      storage(AST).create();
-      break;
-    }
-
-    case "POST": {
-      storage(AST).post();
-      break;
-    }
-
-    default:
-      break;
+  if (action === "LET") {
+    storage(AST).let();
+  } else if (action === "POST") {
+    storage(AST).post();
   }
+
   console.log("ERRORS: ", errors);
+  console.log("AST", AST);
 }
