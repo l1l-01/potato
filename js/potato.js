@@ -18,7 +18,7 @@ const ACTIONS = {
 const DATATYPES = {
   STR: "DATATYPE",
   INT: "DATATYPE",
-  DEC: "DATATYPE",
+  FLT: "DATATYPE",
   BOOL: "DATATYPE",
   DATE: "DATATYPE",
 };
@@ -906,7 +906,7 @@ function parser(VALUE) {
 
 export function storage(AST) {
   return {
-    async let() {
+    let() {
       // Create DB
       const dbName = "app";
       const request = indexedDB.open(dbName, 1);
@@ -940,7 +940,7 @@ export function storage(AST) {
 
           store.add({ metadata: AST.columns, id: 0 });
 
-          console.log(AST.table, " was created successfully!");
+          console.log(AST.table + " was created successfully!");
         };
       }
     },
@@ -962,9 +962,36 @@ export function storage(AST) {
           const cursor = e.target.result;
 
           if (cursor) {
+            const metadata = cursor?.value?.data;
+            const data = AST.columns;
+            let cols = [];
+
+            data.forEach((d) => {
+              metadata.forEach((mdata) => {
+                if (d.name === mdata.name) {
+                  if (mdata.type === "INT") {
+                    console.log("age: ", parseInt(d.value));
+                    cols.push({ name: d.name, value: parseInt(d.value) });
+                  } else if (d.type === "FLT") {
+                    cols.push({
+                      name: d.name,
+                      value: parseFloat(d.value),
+                    });
+                  } else if (d.type === "BOOL") {
+                    const value = d.value === "true" ? true : false;
+                    cols.push({ name: d.name, value: value });
+                  } else {
+                    cols.push({ name: d.name, value: d.value });
+                  }
+                }
+              });
+            });
+
             console.log("The latest key is:", cursor.key);
 
-            store.add({ id: cursor.key + 1, data: AST.columns });
+            store.add({ id: cursor.key + 1, data: cols });
+
+            console.log("Data created successfully!");
           } else {
             const error = ERROR_TYPES.MISSING_METADATA + AST.table;
             errors.push(error);
