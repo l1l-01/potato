@@ -923,8 +923,6 @@ export function storage(AST) {
         const db = event.target.result;
         const storeNames = db.objectStoreNames;
         if (storeNames[0] !== undefined && storeNames[0].trim() !== "") {
-          const error = `${ERROR_TYPES.TABLE_EXISTS} old table: ${storeNames[0]}, new table: ${AST.table}.`;
-          errors.push(error);
           tableExist = true;
         }
       };
@@ -942,12 +940,16 @@ export function storage(AST) {
 
           console.log(AST.table + " was created successfully!");
         };
+      } else {
+        const error = `${ERROR_TYPES.TABLE_EXISTS} old table: ${storeNames[0]}, new table: ${AST.table}.`;
+        errors.push(error);
       }
     },
 
     post() {
       // Open the database
       const db = indexedDB.open("app", 1);
+      let colsExists = false;
 
       db.onsuccess = function (event) {
         // Grab the database instance from the success event
@@ -957,14 +959,21 @@ export function storage(AST) {
         const store = transaction.objectStore(AST.table);
 
         const request = store.openCursor(null, "prev");
+        console.log("Request: ", request);
 
         request.onsuccess = function (e) {
           const cursor = e.target.result;
+          console.log();
 
           if (cursor) {
-            const metadata = cursor?.value?.data;
+            const metadata =
+              cursor.key < 1 ? cursor?.value?.metadata : cursor?.value?.data;
+
             const data = AST.columns;
             let cols = [];
+
+            console.log("metadata: ", metadata);
+            console.log("value: ", cursor);
 
             data.forEach((d) => {
               metadata.forEach((mdata) => {
@@ -987,8 +996,6 @@ export function storage(AST) {
               });
             });
 
-            console.log("The latest key is:", cursor.key);
-
             store.add({ id: cursor.key + 1, data: cols });
 
             console.log("Data created successfully!");
@@ -1004,6 +1011,8 @@ export function storage(AST) {
         errors.push(error);
       };
     },
+
+    get() {},
   };
 }
 
