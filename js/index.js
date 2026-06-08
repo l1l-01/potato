@@ -1,4 +1,4 @@
-import { potato } from "./potato.js";
+import { executor as potato } from "./potato.js";
 
 function getById(id) {
   return document.querySelector(id);

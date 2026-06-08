@@ -904,9 +904,13 @@ function parser(VALUE) {
   return AST;
 }
 
-export function storage(AST) {
-  return {
-    let() {
+export function executor(VALUE) {
+  const AST = parser(VALUE);
+  const action = AST.action;
+  let tableExist = false;
+
+  switch (action) {
+    case "LET": {
       // Create DB
       const dbName = "app";
       const request = indexedDB.open(dbName, 1);
@@ -916,7 +920,6 @@ export function storage(AST) {
         errors.push(error);
       };
 
-      let tableExist = false;
       // Handle attempts to create a second table
       indexedDB.open("app");
       request.onsuccess = (event) => {
@@ -944,9 +947,10 @@ export function storage(AST) {
         const error = `${ERROR_TYPES.TABLE_EXISTS} old table: ${storeNames[0]}, new table: ${AST.table}.`;
         errors.push(error);
       }
-    },
+      break;
+    }
 
-    post() {
+    case "POST": {
       // Open the database
       const db = indexedDB.open("app", 1);
       let colsExists = false;
@@ -959,11 +963,9 @@ export function storage(AST) {
         const store = transaction.objectStore(AST.table);
 
         const request = store.openCursor(null, "prev");
-        console.log("Request: ", request);
 
         request.onsuccess = function (e) {
           const cursor = e.target.result;
-          console.log();
 
           if (cursor) {
             const metadata =
@@ -972,14 +974,10 @@ export function storage(AST) {
             const data = AST.columns;
             let cols = [];
 
-            console.log("metadata: ", metadata);
-            console.log("value: ", cursor);
-
             data.forEach((d) => {
               metadata.forEach((mdata) => {
                 if (d.name === mdata.name) {
                   if (mdata.type === "INT") {
-                    console.log("age: ", parseInt(d.value));
                     cols.push({ name: d.name, value: parseInt(d.value) });
                   } else if (d.type === "FLT") {
                     cols.push({
@@ -1010,20 +1008,12 @@ export function storage(AST) {
         const error = ERROR_TYPES.FAILED_DB + event.target.error;
         errors.push(error);
       };
-    },
+      break;
+    }
 
-    get() {},
-  };
-}
-
-export function potato(VALUE) {
-  const AST = parser(VALUE);
-  const action = AST.action;
-
-  if (action === "LET") {
-    storage(AST).let();
-  } else if (action === "POST") {
-    storage(AST).post();
+    default:
+      errors.push(ERROR_TYPES.MISSING_CRUD_OPERATION);
+      break;
   }
 
   console.log("ERRORS: ", errors);
