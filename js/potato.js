@@ -571,7 +571,7 @@ function parser(VALUE) {
       // Setting table
       AST.table = TABLES[0]?.value;
 
-      // Catching duplicated WHERE keyword in an UPD query
+      // Catching duplicated WHERE keyword in a GET query
       const WHERE_KEYWORDS = keywords.filter((key) => key?.value === "WHERE");
       const WHERE_LENGTH = WHERE_KEYWORDS.length;
 
@@ -906,10 +906,17 @@ function parser(VALUE) {
 
 export function executor(VALUE) {
   const AST = parser(VALUE);
-  const action = AST.action;
   let tableExist = false;
 
-  switch (action) {
+  const res = {
+    action: null,
+    success: null,
+    data: null,
+    msg: null,
+    errors: null,
+  };
+
+  switch (AST.action) {
     case "LET": {
       // Create DB
       const dbName = "app";
@@ -947,6 +954,19 @@ export function executor(VALUE) {
         const error = `${ERROR_TYPES.TABLE_EXISTS} old table: ${storeNames[0]}, new table: ${AST.table}.`;
         errors.push(error);
       }
+
+      if (errors.length === 0) {
+        res.action = AST.action;
+        res.success = true;
+        res.msg = `${AST.table} was created successfully!`;
+        res.data = AST.columns;
+      } else {
+        res.action = "error";
+        res.success = false;
+        res.msg = AST.table + "";
+        res.errors = errors;
+      }
+
       break;
     }
 
@@ -1018,4 +1038,6 @@ export function executor(VALUE) {
 
   console.log("ERRORS: ", errors);
   console.log("AST", AST);
+
+  return res;
 }
