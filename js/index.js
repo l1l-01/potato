@@ -28,7 +28,7 @@ BTN.addEventListener("click", () => {
   }
 
   switch (res.action) {
-    case "LET":
+    case "LET": {
       const span = createEle("span");
       span.innerText = res.msg;
       addClass(span, "success");
@@ -70,6 +70,39 @@ BTN.addEventListener("click", () => {
         TD_TR.appendChild(type);
       });
       break;
+    }
+
+    case "POST": {
+      const span = createEle("span");
+      span.innerText = res.msg;
+      addClass(span, "success");
+      PARENT.appendChild(span);
+
+      const TABLE = createEle("table");
+      PARENT.appendChild(TABLE);
+
+      const TH_TR = createEle("tr");
+      TABLE.appendChild(TH_TR);
+
+      const TB_TR = createEle("tr");
+      TABLE.appendChild(TB_TR);
+
+      const DATA = res?.data;
+
+      DATA.forEach((d) => {
+        const TD = createEle("th");
+        TD.innerText = d.name;
+        TH_TR.appendChild(TD);
+      });
+
+      DATA.forEach((d) => {
+        const TD = createEle("td");
+        TD.innerText = d.value;
+        TB_TR.appendChild(TD);
+      });
+
+      break;
+    }
 
     default:
       console.log("Data is null");

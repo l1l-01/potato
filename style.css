@@ -94,6 +94,10 @@ th {
   text-transform: capitalize;
 }
 
+tr th {
+  background-color: #2f246e;
+}
+
 tr:nth-child(even) {
   background-color: rgba(221, 221, 221, 0.1);
 }

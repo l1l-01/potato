@@ -921,7 +921,7 @@ export function executor(VALUE) {
     case "LET": {
       // Create DB
       const dbName = "app";
-      const request = indexedDB.open(dbName, 1);
+      const request = indexedDB.open("app", 1);
 
       request.onerror = (e) => {
         const error = ERROR_TYPES.OPENING_DB + e;
@@ -960,7 +960,7 @@ export function executor(VALUE) {
         res.table = AST.table;
         res.action = AST.action;
         res.success = true;
-        res.msg = `${AST.table} was created successfully!`;
+        res.msg = `${AST.table} was created successfully:`;
         res.data = AST.columns;
       } else {
         res.action = "error";
@@ -976,6 +976,8 @@ export function executor(VALUE) {
       // Open the database
       const db = indexedDB.open("app", 1);
       let colsExists = false;
+
+      const request = indexedDB.open("app", 1);
 
       db.onsuccess = function (event) {
         // Grab the database instance from the success event
@@ -1030,6 +1032,20 @@ export function executor(VALUE) {
         const error = ERROR_TYPES.FAILED_DB + event.target.error;
         errors.push(error);
       };
+
+      if (errors.length === 0) {
+        res.table = AST.table;
+        res.action = AST.action;
+        res.success = true;
+        res.msg = `Data was stored in ${AST.table} successfully:`;
+        res.data = AST.columns;
+      } else {
+        res.action = "error";
+        res.success = false;
+        res.msg = AST.table + "";
+        res.errors = errors;
+      }
+
       break;
     }
 
