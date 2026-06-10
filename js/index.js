@@ -8,10 +8,13 @@ function addClass(ele, cssClass) {
   ele.classList.add(cssClass);
 }
 
+function createEle(ele) {
+  return document.createElement(ele);
+}
+
 const INPUT = getById("in");
 const BTN = getById("btn");
 const PARENT = getById("parent");
-console.log(PARENT);
 
 BTN.addEventListener("click", () => {
   let VALUE = INPUT.value;
@@ -26,11 +29,46 @@ BTN.addEventListener("click", () => {
 
   switch (res.action) {
     case "LET":
-      const span = document.createElement("span");
+      const span = createEle("span");
       span.innerText = res.msg;
       addClass(span, "success");
       PARENT.appendChild(span);
-      console.log(span);
+
+      const TABLE = createEle("table");
+      PARENT.appendChild(TABLE);
+
+      const TH_TR = createEle("tr");
+      TABLE.appendChild(TH_TR);
+
+      const TABLE_NAME = createEle("th");
+      TABLE_NAME.innerText = res.table;
+      TH_TR.appendChild(TABLE_NAME);
+
+      let fields = [];
+      let datatypes = [];
+
+      res?.data?.forEach((col) => {
+        const TH = createEle("th");
+        TH.innerText = col.name;
+        fields.push(TH);
+
+        const TD = createEle("td");
+        TD.innerText = col.datatype;
+        datatypes.push(TD);
+      });
+
+      fields.forEach((field) => {
+        TH_TR.appendChild(field);
+      });
+
+      const TD_TR = createEle("tr");
+      TABLE.appendChild(TD_TR);
+      const EMPTY_TD = createEle("td");
+      TD_TR.appendChild(EMPTY_TD);
+
+      datatypes.forEach((type) => {
+        TD_TR.appendChild(type);
+      });
       break;
 
     default:

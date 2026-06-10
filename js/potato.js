@@ -909,6 +909,7 @@ export function executor(VALUE) {
   let tableExist = false;
 
   const res = {
+    table: null,
     action: null,
     success: null,
     data: null,
@@ -956,6 +957,7 @@ export function executor(VALUE) {
       }
 
       if (errors.length === 0) {
+        res.table = AST.table;
         res.action = AST.action;
         res.success = true;
         res.msg = `${AST.table} was created successfully!`;
