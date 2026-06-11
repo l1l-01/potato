@@ -104,6 +104,13 @@ BTN.addEventListener("click", () => {
       break;
     }
 
+    case "DROP": {
+      const span = createEle("span");
+      span.innerText = res.msg;
+      addClass(span, "success");
+      PARENT.appendChild(span);
+    }
+
     default:
       console.log("Data is null");
       break;

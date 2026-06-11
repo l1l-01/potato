@@ -51,7 +51,7 @@ const ERROR_TYPES = {
   MISSING_TABLE: "ERROR(006): Your query is missing a table name.",
   MISPLACED_TABLE_NAME: "ERROR(007): Misplaced table name: ",
   MISSING_CRUD_OPERATION:
-    "ERROR(008): Missing operation. Please use one of: LET, GET, UPD, DLT.",
+    "ERROR(008): Missing operation. Please use one of: LET, GET, UPD, DLT, DROP.",
   ID_NOT_NEEDED:
     "ERROR(009): ID is created automatically, remove the provided id: ",
   LIMIT_UNUSABLE: "ERROR(010): Limit can only be used in a GET query: ",
@@ -87,6 +87,7 @@ const ERROR_TYPES = {
   MISSING_METADATA: "ERROR(029): Missing meta deta from table: ",
   TABLE_EXISTS:
     "ERROR(030): You can only create one table at a time; please delete the current table before creating a new one: ",
+  TABLE_NOT_EXIST: "Table doesn't exist: ",
 };
 
 let errors = [];
@@ -897,7 +898,6 @@ function parser(VALUE) {
 
     default:
       errors.push(ERROR_TYPES.MISSING_CRUD_OPERATION);
-      return errors;
       break;
   }
 
@@ -921,7 +921,7 @@ export function executor(VALUE) {
     case "LET": {
       // Create DB
       const dbName = "app";
-      const request = indexedDB.open("app", 1);
+      const request = indexedDB.open("app", Date.now());
 
       request.onerror = (e) => {
         const error = ERROR_TYPES.OPENING_DB + e;
@@ -974,12 +974,10 @@ export function executor(VALUE) {
 
     case "POST": {
       // Open the database
-      const db = indexedDB.open("app", 1);
       let colsExists = false;
+      const request = indexedDB.open("app", Date.now());
 
-      const request = indexedDB.open("app", 1);
-
-      db.onsuccess = function (event) {
+      request.onsuccess = function (event) {
         // Grab the database instance from the success event
         const db = event.target.result;
 
@@ -1022,13 +1020,14 @@ export function executor(VALUE) {
 
             console.log("Data created successfully!");
           } else {
+            // TODO: fix this
             const error = ERROR_TYPES.MISSING_METADATA + AST.table;
             errors.push(error);
           }
         };
       };
 
-      db.onerror = function (event) {
+      request.onerror = function (event) {
         const error = ERROR_TYPES.FAILED_DB + event.target.error;
         errors.push(error);
       };
@@ -1039,6 +1038,48 @@ export function executor(VALUE) {
         res.success = true;
         res.msg = `Data was stored in ${AST.table} successfully:`;
         res.data = AST.columns;
+      } else {
+        res.action = "error";
+        res.success = false;
+        res.msg = AST.table + "";
+        res.errors = errors;
+      }
+
+      break;
+    }
+
+    case "DROP": {
+      const request = indexedDB.open("app", Date.now());
+
+      request.onupgradeneeded = function (event) {
+        const db = event.target.result;
+
+        // Check if store exists before attempting to delete
+        if (db.objectStoreNames.contains(AST.table)) {
+          db.deleteObjectStore(AST.table);
+        } else {
+          // TODO: fix this
+          const error = `${ERROR_TYPES.TABLE_NOT_EXIST} ${AST.table}`;
+          errors.push(error);
+          console.log(`Object store '${AST.table}' does not exist.`);
+        }
+      };
+
+      request.onerror = function (event) {
+        const error = ERROR_TYPES.FAILED_DB + event.target.error;
+        errors.push(error);
+      };
+
+      request.onsuccess = function (event) {
+        const db = event.target.result;
+        db.close();
+      };
+
+      if (errors.length === 0) {
+        res.table = AST.table;
+        res.action = AST.action;
+        res.success = true;
+        res.msg = `Table '${AST.table}' was deleted successfully!`;
       } else {
         res.action = "error";
         res.success = false;
