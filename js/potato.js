@@ -906,6 +906,7 @@ function parser(VALUE) {
 
 export function executor(VALUE) {
   const AST = parser(VALUE);
+  console.log(AST.all);
   let tableExist = false;
 
   const res = {
@@ -1049,37 +1050,50 @@ export function executor(VALUE) {
     }
 
     case "DROP": {
-      const request = indexedDB.open("app", Date.now());
+      if (AST.all) {
+        indexedDB.databases().then((dbs) => {
+          dbs.forEach((db) => {
+            indexedDB.deleteDatabase(db.name);
+          });
+        });
+        res.msg = `Tables were deleted successfully!`;
+        res.all = true;
+      } else {
+        {
+          const request = indexedDB.open("app", Date.now());
 
-      request.onupgradeneeded = function (event) {
-        const db = event.target.result;
+          request.onupgradeneeded = function (event) {
+            const db = event.target.result;
 
-        // Check if store exists before attempting to delete
-        if (db.objectStoreNames.contains(AST.table)) {
-          db.deleteObjectStore(AST.table);
-        } else {
-          // TODO: fix this
-          const error = `${ERROR_TYPES.TABLE_NOT_EXIST} ${AST.table}`;
-          errors.push(error);
-          console.log(`Object store '${AST.table}' does not exist.`);
+            // Check if store exists before attempting to delete
+            if (db.objectStoreNames.contains(AST.table)) {
+              db.deleteObjectStore(AST.table);
+            } else {
+              // TODO: fix this
+              const error = `${ERROR_TYPES.TABLE_NOT_EXIST} ${AST.table}`;
+              errors.push(error);
+              console.log(`Object store '${AST.table}' does not exist.`);
+            }
+          };
+
+          request.onerror = function (event) {
+            const error = ERROR_TYPES.FAILED_DB + event.target.error;
+            errors.push(error);
+          };
+
+          request.onsuccess = function (event) {
+            const db = event.target.result;
+            db.close();
+          };
+
+          res.msg = `Table '${AST.table}' was deleted successfully!`;
         }
-      };
-
-      request.onerror = function (event) {
-        const error = ERROR_TYPES.FAILED_DB + event.target.error;
-        errors.push(error);
-      };
-
-      request.onsuccess = function (event) {
-        const db = event.target.result;
-        db.close();
-      };
+      }
 
       if (errors.length === 0) {
         res.table = AST.table;
         res.action = AST.action;
         res.success = true;
-        res.msg = `Table '${AST.table}' was deleted successfully!`;
       } else {
         res.action = "error";
         res.success = false;
