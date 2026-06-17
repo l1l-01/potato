@@ -904,7 +904,7 @@ function parser(VALUE) {
   return AST;
 }
 
-export function executor(VALUE) {
+export async function executor(VALUE) {
   const AST = parser(VALUE);
   console.log(AST.all);
   let tableExist = false;
@@ -922,7 +922,7 @@ export function executor(VALUE) {
     case "LET": {
       // Create DB
       const dbName = "app";
-      const request = indexedDB.open("app", Date.now());
+      const request = indexedDB.open("app", 1);
 
       request.onerror = (e) => {
         const error = ERROR_TYPES.OPENING_DB + e;
@@ -976,7 +976,7 @@ export function executor(VALUE) {
     case "POST": {
       // Open the database
       let colsExists = false;
-      const request = indexedDB.open("app", Date.now());
+      const request = indexedDB.open("app", 1);
 
       request.onsuccess = function (event) {
         // Grab the database instance from the success event
@@ -1060,7 +1060,7 @@ export function executor(VALUE) {
         res.all = true;
       } else {
         {
-          const request = indexedDB.open("app", Date.now());
+          const request = indexedDB.open("app", 1);
 
           request.onupgradeneeded = function (event) {
             const db = event.target.result;
@@ -1101,6 +1101,62 @@ export function executor(VALUE) {
         res.errors = errors;
       }
 
+      break;
+    }
+
+    case "GET": {
+      let data;
+      function getAllData() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open("app", 1);
+
+          request.onsuccess = (event) => {
+            const db = event.target.result;
+
+            try {
+              const transaction = db.transaction(AST.table, "readonly");
+              const store = transaction.objectStore(AST.table);
+              const getRequest = store.getAll();
+
+              getRequest.onsuccess = () => resolve(getRequest.result);
+              getRequest.onerror = () => reject(getRequest.error);
+            } catch (err) {
+              console.log(err);
+              reject(err);
+            }
+          };
+
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      if (AST.all) {
+        try {
+          data = await getAllData();
+          console.log("ALL DATA: ", data);
+        } catch (err) {
+          if (err.name === "NotFoundError") {
+            const error = `${ERROR_TYPES.TABLE_NOT_EXIST} ${AST.table}`;
+            errors.push(error);
+          } else {
+            const error = `${ERROR_TYPES.FAILED_DB} ${AST.err}`;
+            errors.push(error);
+          }
+        }
+      }
+
+      if (errors.length === 0) {
+        res.table = AST.table;
+        res.action = AST.action;
+        res.success = true;
+        res.msg = `Data retrieved successfully from '${AST.table}' :`;
+        res.data = data;
+      } else {
+        res.action = "error";
+        res.success = false;
+        res.msg = "Errors: ";
+        res.errors = errors;
+      }
       break;
     }
 

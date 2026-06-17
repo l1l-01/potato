@@ -11,7 +11,7 @@ body {
   min-height: 100vh;
   flex-direction: column;
   gap: 20px;
-  background: linear-gradient(to bottom, #17153b, #2e236c, #433d8b, #c8acd6);
+  background: linear-gradient(to bottom, #17153b, #2e236c, #433d8b);
   padding-top: 20px;
   padding-inline: 20px;
 }

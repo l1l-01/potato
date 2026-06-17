@@ -16,9 +16,9 @@ const INPUT = getById("in");
 const BTN = getById("btn");
 const PARENT = getById("parent");
 
-BTN.addEventListener("click", () => {
+BTN.addEventListener("click", async () => {
   let VALUE = INPUT.value;
-  const res = potato(VALUE);
+  const res = await potato(VALUE);
 
   console.log("response: ", res);
 
@@ -109,6 +109,12 @@ BTN.addEventListener("click", () => {
       span.innerText = res.msg;
       addClass(span, "success");
       PARENT.appendChild(span);
+      break;
+    }
+
+    case "GET": {
+      console.log("GET is working!");
+      break;
     }
 
     default:
