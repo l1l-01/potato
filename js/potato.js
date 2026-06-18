@@ -922,7 +922,7 @@ export async function executor(VALUE) {
     case "LET": {
       // Create DB
       const dbName = "app";
-      const request = indexedDB.open("app", 1);
+      const request = indexedDB.open("app", Date.now());
 
       request.onerror = (e) => {
         const error = ERROR_TYPES.OPENING_DB + e;
@@ -976,7 +976,7 @@ export async function executor(VALUE) {
     case "POST": {
       // Open the database
       let colsExists = false;
-      const request = indexedDB.open("app", 1);
+      const request = indexedDB.open("app", Date.now());
 
       request.onsuccess = function (event) {
         // Grab the database instance from the success event
@@ -1059,34 +1059,44 @@ export async function executor(VALUE) {
         res.msg = `Tables were deleted successfully!`;
         res.all = true;
       } else {
-        {
-          const request = indexedDB.open("app", 1);
+        // TODO: fix the error that returns after the table was droped
+        function dropOne() {
+          return new Promise((resolve, reject) => {
+            const request = indexedDB.open("app", Date.now());
 
-          request.onupgradeneeded = function (event) {
-            const db = event.target.result;
+            try {
+              request.onupgradeneeded = function (event) {
+                const db = event.target.result;
 
-            // Check if store exists before attempting to delete
-            if (db.objectStoreNames.contains(AST.table)) {
-              db.deleteObjectStore(AST.table);
-            } else {
-              // TODO: fix this
-              const error = `${ERROR_TYPES.TABLE_NOT_EXIST} ${AST.table}`;
-              errors.push(error);
-              console.log(`Object store '${AST.table}' does not exist.`);
+                // Check if store exists before attempting to delete
+                if (db.objectStoreNames.contains(AST.table)) {
+                  db.deleteObjectStore(AST.table);
+                  db.close();
+                  resolve();
+                }
+              };
+
+              request.onsuccess = () => resolve(request.result);
+              request.onerror = () => reject(request.error);
+            } catch (err) {
+              reject(err);
             }
-          };
 
-          request.onerror = function (event) {
-            const error = ERROR_TYPES.FAILED_DB + event.target.error;
-            errors.push(error);
-          };
+            request.onerror = () => reject(request.error);
+          });
+        }
 
-          request.onsuccess = function (event) {
-            const db = event.target.result;
-            db.close();
-          };
-
+        try {
+          await dropOne();
           res.msg = `Table '${AST.table}' was deleted successfully!`;
+        } catch (err) {
+          if (err.name === "NotFoundError") {
+            const error = `${ERROR_TYPES.TABLE_NOT_EXIST} ${AST.table}`;
+            errors.push(error);
+          } else {
+            const error = `${ERROR_TYPES.FAILED_DB} ${err}`;
+            errors.push(error);
+          }
         }
       }
 
@@ -1108,7 +1118,7 @@ export async function executor(VALUE) {
       let data;
       function getAllData() {
         return new Promise((resolve, reject) => {
-          const request = indexedDB.open("app", 1);
+          const request = indexedDB.open("app", Date.now());
 
           request.onsuccess = (event) => {
             const db = event.target.result;
@@ -1133,13 +1143,12 @@ export async function executor(VALUE) {
       if (AST.all) {
         try {
           data = await getAllData();
-          console.log("ALL DATA: ", data);
         } catch (err) {
           if (err.name === "NotFoundError") {
             const error = `${ERROR_TYPES.TABLE_NOT_EXIST} ${AST.table}`;
             errors.push(error);
           } else {
-            const error = `${ERROR_TYPES.FAILED_DB} ${AST.err}`;
+            const error = `${ERROR_TYPES.FAILED_DB} ${err}`;
             errors.push(error);
           }
         }
