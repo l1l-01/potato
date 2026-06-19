@@ -77,17 +77,21 @@ const ERROR_TYPES = {
     "ERROR(023): You are only allowed to use id (#1), field ($field) and value (:value) after the keyword AND: ",
   NOT_ALLOWED_AFTER_SCOPE:
     "ERROR(024): You are only allowed to use AND or OR or BETWEEN after the keyword ',': ",
-  ID_CANNOT_UPDATE: "ERROR(024): You are not allowed to update the ID ",
+  ID_CANNOT_UPDATE: "ERROR(025): You are not allowed to update the ID ",
   FIELD_NOT_ALLOWED:
-    "ERROR(025): You are only allwoed to use fields in LET, GET, UPD and DLT queries: ",
-  ID_CAN_NOT_USED: "ERROR(026): You are not allwoed to use ids in DROP query: ",
-  DUPLICATED_DESC: "ERROR(027): Duplicated DESC: ",
-  OPENING_DB: "ERROR(028): Can't open database: ",
-  FAILED_DB: "ERROR(028): Database failed to open: ",
-  MISSING_METADATA: "ERROR(029): Missing meta deta from table: ",
+    "ERROR(026): You are only allwoed to use fields in LET, GET, UPD and DLT queries: ",
+  ID_CAN_NOT_USED: "ERROR(027): You are not allwoed to use ids in DROP query: ",
+  DUPLICATED_DESC: "ERROR(028): Duplicated DESC: ",
+  OPENING_DB: "ERROR(029): Can't open database: ",
+  FAILED_DB: "ERROR(030): Database failed to open: ",
+  MISSING_METADATA: "ERROR(031): Missing meta deta from table: ",
   TABLE_EXISTS:
-    "ERROR(030): You can only create one table at a time; please delete the current table before creating a new one: ",
-  TABLE_NOT_EXIST: "Table doesn't exist: ",
+    "ERROR(032): You can only create one table at a time; please delete the current table before creating a new one: ",
+  TABLE_NOT_EXIST: "ERROR(033): Table doesn't exist: ",
+  FIELD_NOT_EXIST: "ERROR(034): Field does not exist: ",
+  DATATYPE_NULL: "ERROR(035): Datatype is null: ",
+  METADATA_NOT_MATCH_DATA:
+    "ERROR(036): Table metadata doesn't match with the data you are trying to POST: ",
 };
 
 let errors = [];
@@ -918,260 +922,282 @@ export async function executor(VALUE) {
     errors: null,
   };
 
-  switch (AST.action) {
-    case "LET": {
-      // Create DB
-      const dbName = "app";
-      const request = indexedDB.open("app", Date.now());
+  if (errors.length === 0) {
+    switch (AST.action) {
+      case "LET": {
+        // Create DB
+        const dbName = "app";
+        const request = indexedDB.open("app", Date.now());
 
-      request.onerror = (e) => {
-        const error = ERROR_TYPES.OPENING_DB + e;
-        errors.push(error);
-      };
-
-      // Handle attempts to create a second table
-      indexedDB.open("app");
-      request.onsuccess = (event) => {
-        const db = event.target.result;
-        const storeNames = db.objectStoreNames;
-        if (storeNames[0] !== undefined && storeNames[0].trim() !== "") {
-          tableExist = true;
-        }
-      };
-
-      if (!tableExist) {
-        // Create table
-        request.onupgradeneeded = (event) => {
-          const db = event.target.result;
-
-          const store = db.createObjectStore(AST.table, {
-            keyPath: "id",
-          });
-
-          store.add({ metadata: AST.columns, id: 0 });
-
-          console.log(AST.table + " was created successfully!");
+        request.onerror = (e) => {
+          const error = ERROR_TYPES.OPENING_DB + e;
+          errors.push(error);
         };
-      } else {
-        const error = `${ERROR_TYPES.TABLE_EXISTS} old table: ${storeNames[0]}, new table: ${AST.table}.`;
-        errors.push(error);
-      }
 
-      if (errors.length === 0) {
-        res.table = AST.table;
-        res.action = AST.action;
-        res.success = true;
-        res.msg = `${AST.table} was created successfully:`;
-        res.data = AST.columns;
-      } else {
-        res.action = "error";
-        res.success = false;
-        res.msg = AST.table + "";
-        res.errors = errors;
-      }
-
-      break;
-    }
-
-    case "POST": {
-      // Open the database
-      let colsExists = false;
-      const request = indexedDB.open("app", Date.now());
-
-      request.onsuccess = function (event) {
-        // Grab the database instance from the success event
-        const db = event.target.result;
-
-        const transaction = db.transaction(AST.table, "readwrite");
-        const store = transaction.objectStore(AST.table);
-
-        const request = store.openCursor(null, "prev");
-
-        request.onsuccess = function (e) {
-          const cursor = e.target.result;
-
-          if (cursor) {
-            const metadata =
-              cursor.key < 1 ? cursor?.value?.metadata : cursor?.value?.data;
-
-            const data = AST.columns;
-            let cols = [];
-
-            data.forEach((d) => {
-              metadata.forEach((mdata) => {
-                if (d.name === mdata.name) {
-                  if (mdata.type === "INT") {
-                    cols.push({ name: d.name, value: parseInt(d.value) });
-                  } else if (d.type === "FLT") {
-                    cols.push({
-                      name: d.name,
-                      value: parseFloat(d.value),
-                    });
-                  } else if (d.type === "BOOL") {
-                    const value = d.value === "true" ? true : false;
-                    cols.push({ name: d.name, value: value });
-                  } else {
-                    cols.push({ name: d.name, value: d.value });
-                  }
-                }
-              });
-            });
-
-            store.add({ id: cursor.key + 1, data: cols });
-
-            console.log("Data created successfully!");
-          } else {
-            // TODO: fix this
-            const error = ERROR_TYPES.MISSING_METADATA + AST.table;
-            errors.push(error);
+        // Handle attempts to create a second table
+        indexedDB.open("app");
+        request.onsuccess = (event) => {
+          const db = event.target.result;
+          const storeNames = db.objectStoreNames;
+          if (storeNames[0] !== undefined && storeNames[0].trim() !== "") {
+            tableExist = true;
           }
         };
-      };
 
-      request.onerror = function (event) {
-        const error = ERROR_TYPES.FAILED_DB + event.target.error;
-        errors.push(error);
-      };
+        if (!tableExist) {
+          // Create table
+          request.onupgradeneeded = (event) => {
+            const db = event.target.result;
 
-      if (errors.length === 0) {
-        res.table = AST.table;
-        res.action = AST.action;
-        res.success = true;
-        res.msg = `Data was stored in ${AST.table} successfully:`;
-        res.data = AST.columns;
-      } else {
-        res.action = "error";
-        res.success = false;
-        res.msg = AST.table + "";
-        res.errors = errors;
+            const store = db.createObjectStore(AST.table, {
+              keyPath: "id",
+            });
+
+            store.add({ metadata: AST.columns, id: 0 });
+
+            console.log(AST.table + " was created successfully!");
+          };
+        } else {
+          const error = `${ERROR_TYPES.TABLE_EXISTS} old table: ${storeNames[0]}, new table: ${AST.table}.`;
+          errors.push(error);
+        }
+
+        if (errors.length === 0) {
+          res.table = AST.table;
+          res.action = AST.action;
+          res.success = true;
+          res.msg = `${AST.table} was created successfully:`;
+          res.data = AST.columns;
+        } else {
+          res.action = "error";
+          res.success = false;
+          res.msg = AST.table + "";
+          res.errors = errors;
+        }
+
+        break;
       }
 
-      break;
-    }
+      case "POST": {
+        function postData() {
+          return new Promise((resolve, reject) => {
+            const dbRequest = indexedDB.open("app", Date.now());
 
-    case "DROP": {
-      if (AST.all) {
-        indexedDB.databases().then((dbs) => {
-          dbs.forEach((db) => {
-            indexedDB.deleteDatabase(db.name);
+            dbRequest.onsuccess = function (event) {
+              const db = event.target.result;
+              const tx = db.transaction(AST.table, "readwrite");
+              const store = tx.objectStore(AST.table);
+
+              // Handle transaction-level errors (silent erros)
+              tx.onerror = () => reject(tx.error);
+              tx.onabort = () => reject(new Error("Transaction aborted"));
+
+              const cursorRequest = store.openCursor(null, "prev");
+
+              cursorRequest.onsuccess = function (e) {
+                const cursor = e.target.result;
+
+                if (!cursor) {
+                  reject(new Error(ERROR_TYPES.MISSING_METADATA));
+                  return;
+                }
+
+                const metadata =
+                  cursor.key < 1 ? cursor.value?.metadata : cursor.value?.data;
+
+                const data = AST.columns;
+                let cols = [];
+
+                for (const d of data) {
+                  let fieldFound = false;
+
+                  for (const mdata of metadata) {
+                    if (d.name === mdata.name) {
+                      fieldFound = true;
+
+                      if (mdata.type === "INT") {
+                        cols.push({ name: d.name, value: parseInt(d.value) });
+                      } else if (mdata.type === "FLT") {
+                        cols.push({ name: d.name, value: parseFloat(d.value) });
+                      } else if (mdata.type === "BOOL") {
+                        cols.push({ name: d.name, value: d.value === "true" });
+                      } else if (mdata.type === "STR") {
+                        cols.push({ name: d.name, value: d.value });
+                      } else {
+                        reject(new Error(ERROR_TYPES.DATATYPE_NULL + d.type));
+                        return;
+                      }
+                      break;
+                    }
+                  }
+
+                  if (!fieldFound) {
+                    reject(new Error(ERROR_TYPES.FIELD_NOT_EXIST + d.name));
+                    return;
+                  }
+                }
+
+                const postRequest = store.add({
+                  id: cursor.key + 1,
+                  data: cols,
+                });
+                postRequest.onsuccess = () => resolve(postRequest.result);
+                postRequest.onerror = () => reject(postRequest.error);
+              };
+
+              cursorRequest.onerror = () => reject(cursorRequest.error);
+            };
+
+            dbRequest.onerror = () => reject(dbRequest.error);
           });
-        });
-        res.msg = `Tables were deleted successfully!`;
-        res.all = true;
-      } else {
-        // TODO: fix the error that returns after the table was droped
-        function dropOne() {
+        }
+
+        try {
+          await postData();
+        } catch (err) {
+          errors.push(err.message);
+        }
+
+        if (errors.length === 0) {
+          res.table = AST.table;
+          res.action = AST.action;
+          res.success = true;
+          res.msg = `Data was stored in ${AST.table} successfully:`;
+          res.data = AST.columns;
+        } else {
+          res.action = "error";
+          res.success = false;
+          res.msg = AST.table + "";
+          res.errors = errors;
+        }
+
+        break;
+      }
+
+      case "DROP": {
+        if (AST.all) {
+          indexedDB.databases().then((dbs) => {
+            dbs.forEach((db) => {
+              indexedDB.deleteDatabase(db.name);
+            });
+          });
+          res.msg = `Tables were deleted successfully!`;
+          res.all = true;
+        } else {
+          // TODO: fix the error that returns after the table was droped
+          function dropOne() {
+            return new Promise((resolve, reject) => {
+              const request = indexedDB.open("app", Date.now());
+
+              try {
+                request.onupgradeneeded = function (event) {
+                  const db = event.target.result;
+
+                  // Check if store exists before attempting to delete
+                  if (db.objectStoreNames.contains(AST.table)) {
+                    db.deleteObjectStore(AST.table);
+                    db.close();
+                    resolve();
+                  }
+                };
+
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+              } catch (err) {
+                reject(err);
+              }
+
+              request.onerror = () => reject(request.error);
+            });
+          }
+
+          try {
+            await dropOne();
+            res.msg = `Table '${AST.table}' was deleted successfully!`;
+          } catch (err) {
+            if (err.name === "NotFoundError") {
+              const error = `${ERROR_TYPES.TABLE_NOT_EXIST} ${AST.table}`;
+              errors.push(error);
+            } else {
+              const error = `${ERROR_TYPES.FAILED_DB} ${err}`;
+              errors.push(error);
+            }
+          }
+        }
+
+        if (errors.length === 0) {
+          res.table = AST.table;
+          res.action = AST.action;
+          res.success = true;
+        } else {
+          res.action = "error";
+          res.success = false;
+          res.msg = AST.table + "";
+          res.errors = errors;
+        }
+
+        break;
+      }
+
+      case "GET": {
+        let data;
+        function getAllData() {
           return new Promise((resolve, reject) => {
             const request = indexedDB.open("app", Date.now());
 
-            try {
-              request.onupgradeneeded = function (event) {
-                const db = event.target.result;
+            request.onsuccess = (event) => {
+              const db = event.target.result;
 
-                // Check if store exists before attempting to delete
-                if (db.objectStoreNames.contains(AST.table)) {
-                  db.deleteObjectStore(AST.table);
-                  db.close();
-                  resolve();
-                }
-              };
+              try {
+                const transaction = db.transaction(AST.table, "readonly");
+                const store = transaction.objectStore(AST.table);
+                const getRequest = store.getAll();
 
-              request.onsuccess = () => resolve(request.result);
-              request.onerror = () => reject(request.error);
-            } catch (err) {
-              reject(err);
-            }
+                getRequest.onsuccess = () => resolve(getRequest.result);
+                getRequest.onerror = () => reject(getRequest.error);
+              } catch (err) {
+                console.log(err);
+                reject(err);
+              }
+            };
 
             request.onerror = () => reject(request.error);
           });
         }
 
-        try {
-          await dropOne();
-          res.msg = `Table '${AST.table}' was deleted successfully!`;
-        } catch (err) {
-          if (err.name === "NotFoundError") {
-            const error = `${ERROR_TYPES.TABLE_NOT_EXIST} ${AST.table}`;
-            errors.push(error);
-          } else {
-            const error = `${ERROR_TYPES.FAILED_DB} ${err}`;
-            errors.push(error);
-          }
-        }
-      }
-
-      if (errors.length === 0) {
-        res.table = AST.table;
-        res.action = AST.action;
-        res.success = true;
-      } else {
-        res.action = "error";
-        res.success = false;
-        res.msg = AST.table + "";
-        res.errors = errors;
-      }
-
-      break;
-    }
-
-    case "GET": {
-      let data;
-      function getAllData() {
-        return new Promise((resolve, reject) => {
-          const request = indexedDB.open("app", Date.now());
-
-          request.onsuccess = (event) => {
-            const db = event.target.result;
-
-            try {
-              const transaction = db.transaction(AST.table, "readonly");
-              const store = transaction.objectStore(AST.table);
-              const getRequest = store.getAll();
-
-              getRequest.onsuccess = () => resolve(getRequest.result);
-              getRequest.onerror = () => reject(getRequest.error);
-            } catch (err) {
-              console.log(err);
-              reject(err);
+        if (AST.all) {
+          try {
+            data = await getAllData();
+          } catch (err) {
+            if (err.name === "NotFoundError") {
+              const error = `${ERROR_TYPES.TABLE_NOT_EXIST} ${AST.table}`;
+              errors.push(error);
+            } else {
+              const error = `${ERROR_TYPES.FAILED_DB} ${err}`;
+              errors.push(error);
             }
-          };
-
-          request.onerror = () => reject(request.error);
-        });
-      }
-
-      if (AST.all) {
-        try {
-          data = await getAllData();
-        } catch (err) {
-          if (err.name === "NotFoundError") {
-            const error = `${ERROR_TYPES.TABLE_NOT_EXIST} ${AST.table}`;
-            errors.push(error);
-          } else {
-            const error = `${ERROR_TYPES.FAILED_DB} ${err}`;
-            errors.push(error);
           }
         }
+
+        if (errors.length === 0) {
+          res.table = AST.table;
+          res.action = AST.action;
+          res.success = true;
+          res.msg = `Data retrieved successfully from '${AST.table}' :`;
+          res.data = data;
+        } else {
+          res.action = "error";
+          res.success = false;
+          res.msg = "Errors: ";
+          res.errors = errors;
+        }
+        break;
       }
 
-      if (errors.length === 0) {
-        res.table = AST.table;
-        res.action = AST.action;
-        res.success = true;
-        res.msg = `Data retrieved successfully from '${AST.table}' :`;
-        res.data = data;
-      } else {
-        res.action = "error";
-        res.success = false;
-        res.msg = "Errors: ";
-        res.errors = errors;
-      }
-      break;
+      default:
+        errors.push(ERROR_TYPES.MISSING_CRUD_OPERATION);
+        break;
     }
-
-    default:
-      errors.push(ERROR_TYPES.MISSING_CRUD_OPERATION);
-      break;
   }
 
   console.log("ERRORS: ", errors);
