@@ -979,6 +979,7 @@ export async function executor(VALUE) {
       }
 
       case "POST": {
+        // TODO: select both metadata and previous data instead of only one
         function postData() {
           return new Promise((resolve, reject) => {
             const dbRequest = indexedDB.open("app", Date.now());
@@ -1015,13 +1016,13 @@ export async function executor(VALUE) {
                     if (d.name === mdata.name) {
                       fieldFound = true;
 
-                      if (mdata.type === "INT") {
+                      if (mdata.datatype === "INT") {
                         cols.push({ name: d.name, value: parseInt(d.value) });
-                      } else if (mdata.type === "FLT") {
+                      } else if (mdata.datatype === "FLT") {
                         cols.push({ name: d.name, value: parseFloat(d.value) });
-                      } else if (mdata.type === "BOOL") {
+                      } else if (mdata.datatype === "BOOL") {
                         cols.push({ name: d.name, value: d.value === "true" });
-                      } else if (mdata.type === "STR") {
+                      } else if (mdata.datatype === "STR") {
                         cols.push({ name: d.name, value: d.value });
                       } else {
                         reject(new Error(ERROR_TYPES.DATATYPE_NULL + d.type));
