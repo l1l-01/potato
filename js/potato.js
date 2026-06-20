@@ -84,7 +84,7 @@ const ERROR_TYPES = {
   DUPLICATED_DESC: "ERROR(028): Duplicated DESC: ",
   OPENING_DB: "ERROR(029): Can't open database: ",
   FAILED_DB: "ERROR(030): Database failed to open: ",
-  MISSING_METADATA: "ERROR(031): Missing meta deta from table: ",
+  MISSING_METADATA: "ERROR(031): Missing metadata for table: ",
   TABLE_EXISTS:
     "ERROR(032): You can only create one table at a time; please delete the current table before creating a new one: ",
   TABLE_NOT_EXIST: "ERROR(033): Table doesn't exist: ",
@@ -979,7 +979,6 @@ export async function executor(VALUE) {
       }
 
       case "POST": {
-        // TODO: select both metadata and previous data instead of only one
         function postData() {
           return new Promise((resolve, reject) => {
             const dbRequest = indexedDB.open("app", Date.now());
@@ -989,9 +988,29 @@ export async function executor(VALUE) {
               const tx = db.transaction(AST.table, "readwrite");
               const store = tx.objectStore(AST.table);
 
+              const getMetadata = store.get(0);
+
               // Handle transaction-level errors (silent erros)
               tx.onerror = () => reject(tx.error);
               tx.onabort = () => reject(new Error("Transaction aborted"));
+
+              let metadata = null;
+
+              // Get metadata
+              getMetadata.onsuccess = function () {
+                if (!getMetadata.result?.metadata) {
+                  const ERROR = ERROR_TYPES.MISSING_METADATA + AST.table;
+                  reject(new Error(ERROR));
+                } else {
+                  metadata = getMetadata?.result?.metadata;
+                  resolve(getMetadata.result);
+                }
+              };
+
+              getMetadata.onerror = function () {
+                const ERROR = ERROR_TYPES.MISSING_METADATA + AST.table;
+                reject(new Error(ERROR));
+              };
 
               const cursorRequest = store.openCursor(null, "prev");
 
@@ -1002,9 +1021,6 @@ export async function executor(VALUE) {
                   reject(new Error(ERROR_TYPES.MISSING_METADATA));
                   return;
                 }
-
-                const metadata =
-                  cursor.key < 1 ? cursor.value?.metadata : cursor.value?.data;
 
                 const data = AST.columns;
                 let cols = [];
