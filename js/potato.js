@@ -92,6 +92,8 @@ const ERROR_TYPES = {
   DATATYPE_NULL: "ERROR(035): Datatype is null: ",
   METADATA_NOT_MATCH_DATA:
     "ERROR(036): Table metadata doesn't match with the data you are trying to POST: ",
+  TRANSACTION_ABORTED: "Error(037): Transaction aborted!",
+  TRANSACTION_ERROR: "Error(038): Transaction error: ",
 };
 
 let errors = [];
@@ -969,9 +971,9 @@ export async function executor(VALUE) {
           res.msg = `${AST.table} was created successfully:`;
           res.data = AST.columns;
         } else {
+          res.table = AST.table;
           res.action = "error";
           res.success = false;
-          res.msg = AST.table + "";
           res.errors = errors;
         }
 
@@ -991,16 +993,17 @@ export async function executor(VALUE) {
               const getMetadata = store.get(0);
 
               // Handle transaction-level errors (silent erros)
-              tx.onerror = () => reject(tx.error);
-              tx.onabort = () => reject(new Error("Transaction aborted"));
+              tx.onerror = () =>
+                reject(ERROR_TYPES.TRANSACTION_ERROR + tx.error);
+              tx.onabort = () =>
+                reject(new Error(ERROR_TYPES.TRANSACTION_ABORTED));
 
               let metadata = null;
 
               // Get metadata
               getMetadata.onsuccess = function () {
                 if (!getMetadata.result?.metadata) {
-                  const ERROR = ERROR_TYPES.MISSING_METADATA + AST.table;
-                  reject(new Error(ERROR));
+                  reject(new Error(ERROR_TYPES.MISSING_METADATA + AST.table));
                 } else {
                   metadata = getMetadata?.result?.metadata;
                   resolve(getMetadata.result);
@@ -1008,8 +1011,7 @@ export async function executor(VALUE) {
               };
 
               getMetadata.onerror = function () {
-                const ERROR = ERROR_TYPES.MISSING_METADATA + AST.table;
-                reject(new Error(ERROR));
+                reject(new Error(ERROR_TYPES.MISSING_METADATA + AST.table));
               };
 
               const cursorRequest = store.openCursor(null, "prev");
@@ -1082,9 +1084,9 @@ export async function executor(VALUE) {
           res.msg = `Data was stored in ${AST.table} successfully:`;
           res.data = AST.columns;
         } else {
+          res.table = AST.table;
           res.action = "error";
           res.success = false;
-          res.msg = AST.table + "";
           res.errors = errors;
         }
 
@@ -1101,7 +1103,6 @@ export async function executor(VALUE) {
           res.msg = `Tables were deleted successfully!`;
           res.all = true;
         } else {
-          // TODO: fix the error that returns after the table was droped
           function dropOne() {
             return new Promise((resolve, reject) => {
               const request = indexedDB.open("app", Date.now());
@@ -1115,13 +1116,15 @@ export async function executor(VALUE) {
                     db.deleteObjectStore(AST.table);
                     db.close();
                     resolve();
+                  } else {
+                    reject(new Error(ERROR_TYPES.TABLE_NOT_EXIST + AST.table));
                   }
                 };
 
                 request.onsuccess = () => resolve(request.result);
                 request.onerror = () => reject(request.error);
               } catch (err) {
-                reject(err);
+                reject(new Error(ERROR_TYPES.FAILED_DB + err.message));
               }
 
               request.onerror = () => reject(request.error);
@@ -1130,26 +1133,20 @@ export async function executor(VALUE) {
 
           try {
             await dropOne();
-            res.msg = `Table '${AST.table}' was deleted successfully!`;
           } catch (err) {
-            if (err.name === "NotFoundError") {
-              const error = `${ERROR_TYPES.TABLE_NOT_EXIST} ${AST.table}`;
-              errors.push(error);
-            } else {
-              const error = `${ERROR_TYPES.FAILED_DB} ${err}`;
-              errors.push(error);
-            }
+            errors.push(err.message);
           }
         }
 
         if (errors.length === 0) {
+          res.msg = `Table '${AST.table}' was deleted successfully!`;
           res.table = AST.table;
           res.action = AST.action;
           res.success = true;
         } else {
+          res.table = AST.table;
           res.action = "error";
           res.success = false;
-          res.msg = AST.table + "";
           res.errors = errors;
         }
 
@@ -1166,15 +1163,19 @@ export async function executor(VALUE) {
               const db = event.target.result;
 
               try {
-                const transaction = db.transaction(AST.table, "readonly");
-                const store = transaction.objectStore(AST.table);
+                const tx = db.transaction(AST.table, "readonly");
+                const store = tx.objectStore(AST.table);
                 const getRequest = store.getAll();
+
+                tx.onerror = () =>
+                  reject(ERROR_TYPES.TRANSACTION_ERROR + tx.error);
+                tx.onabort = () =>
+                  reject(new Error(ERROR_TYPES.TRANSACTION_ABORTED));
 
                 getRequest.onsuccess = () => resolve(getRequest.result);
                 getRequest.onerror = () => reject(getRequest.error);
               } catch (err) {
-                console.log(err);
-                reject(err);
+                reject(new Error(ERROR_TYPES.TABLE_NOT_EXIST + AST.table));
               }
             };
 
@@ -1186,13 +1187,7 @@ export async function executor(VALUE) {
           try {
             data = await getAllData();
           } catch (err) {
-            if (err.name === "NotFoundError") {
-              const error = `${ERROR_TYPES.TABLE_NOT_EXIST} ${AST.table}`;
-              errors.push(error);
-            } else {
-              const error = `${ERROR_TYPES.FAILED_DB} ${err}`;
-              errors.push(error);
-            }
+            errors.push(err.message);
           }
         }
 
@@ -1203,9 +1198,9 @@ export async function executor(VALUE) {
           res.msg = `Data retrieved successfully from '${AST.table}' :`;
           res.data = data;
         } else {
+          res.table = AST.table;
           res.action = "error";
           res.success = false;
-          res.msg = "Errors: ";
           res.errors = errors;
         }
         break;
