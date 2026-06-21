@@ -85,8 +85,7 @@ const ERROR_TYPES = {
   OPENING_DB: "ERROR(029): Can't open database: ",
   FAILED_DB: "ERROR(030): Database failed to open: ",
   MISSING_METADATA: "ERROR(031): Missing metadata for table: ",
-  TABLE_EXISTS:
-    "ERROR(032): You can only create one table at a time; please delete the current table before creating a new one: ",
+  TABLE_EXISTS: "ERROR(032): Table Already exists: ",
   TABLE_NOT_EXIST: "ERROR(033): Table doesn't exist: ",
   FIELD_NOT_EXIST: "ERROR(034): Field does not exist: ",
   DATATYPE_NULL: "ERROR(035): Datatype is null: ",
@@ -931,39 +930,20 @@ export async function executor(VALUE) {
         function createTable() {
           return new Promise((resolve, reject) => {
             const request = indexedDB.open("app", Date.now());
-
             try {
-              // Handle attempts to create a second table
-              indexedDB.open("app");
-              request.onsuccess = (event) => {
+              // Create table
+              request.onupgradeneeded = (event) => {
                 const db = event.target.result;
-                const storeNames = db.objectStoreNames;
-                if (
-                  storeNames[0] !== undefined &&
-                  storeNames[0].trim() !== ""
-                ) {
-                  tableExist = true;
-                }
-              };
 
-              if (!tableExist) {
-                // Create table
-                request.onupgradeneeded = (event) => {
-                  const db = event.target.result;
-
+                try {
                   const store = db.createObjectStore(AST.table, {
                     keyPath: "id",
                   });
-
                   store.add({ metadata: AST.columns, id: 0 });
-                };
-              } else {
-                reject(
-                  new Error(
-                    `${ERROR_TYPES.TABLE_EXISTS} old table: ${storeNames[0]}, new table: ${AST.table}.`,
-                  ),
-                );
-              }
+                } catch (error) {
+                  reject(new Error(ERROR_TYPES.TABLE_EXISTS + AST.table));
+                }
+              };
             } catch (err) {
               reject(new Error(ERROR_TYPES.FAILED_DB + err.message));
             }
@@ -975,7 +955,7 @@ export async function executor(VALUE) {
 
         try {
           await createTable();
-        } catch (error) {
+        } catch (err) {
           errors.push(err.message);
         }
 
