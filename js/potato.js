@@ -63,9 +63,9 @@ const ERROR_TYPES = {
     "ERROR(013): Fields and their types are required to create a table.",
   MISSING_FIELD_VALUE:
     "ERROR(014): Fields and their values are required to create a table.",
-  MISSING_FIELD: "ERROR(015): Missing field(s).",
-  MISSING_DATATYPE: "ERROR(016): Missing datatype(s).",
-  MISSING_VALUE: "ERROR(017): Missing value(s).",
+  MISSING_FIELD: "ERROR(015): Missing field(s): ",
+  MISSING_DATATYPE: "ERROR(016): Missing datatype(s): ",
+  MISSING_VALUE: "ERROR(017): Missing value(s): ",
   MISPLACED_DATATYPE: "ERROR(018): Datatype must appear after its field: ",
   MISPLACED_VALUE:
     "ERROR(019): Value must appear after its field, its field's datatype, or an operator: ",
@@ -768,7 +768,7 @@ function parser(VALUE) {
         datatypes.forEach((type, i) => {
           typesInfo += `${type.value} at position ${type.position}${DATATYPES_LENGTH == i + 1 ? "." : ","}`;
         });
-        const error = `${ERROR_TYPES.DATATYPES_NOT_ALLOWED} ${typesInfo}`;
+        const error = `${ERROR_TYPES.DATATYPES_NOT_ALLOWED} ${typesonupgradeneededInfo}`;
         errors.push(error);
       }
 
@@ -912,7 +912,6 @@ function parser(VALUE) {
 
 export async function executor(VALUE) {
   const AST = parser(VALUE);
-  console.log(AST.all);
   let tableExist = false;
 
   const res = {
@@ -928,40 +927,56 @@ export async function executor(VALUE) {
     switch (AST.action) {
       case "LET": {
         // Create DB
-        const dbName = "app";
-        const request = indexedDB.open("app", Date.now());
 
-        request.onerror = (e) => {
-          const error = ERROR_TYPES.OPENING_DB + e;
-          errors.push(error);
-        };
+        function createTable() {
+          return new Promise((resolve, reject) => {
+            const request = indexedDB.open("app", Date.now());
 
-        // Handle attempts to create a second table
-        indexedDB.open("app");
-        request.onsuccess = (event) => {
-          const db = event.target.result;
-          const storeNames = db.objectStoreNames;
-          if (storeNames[0] !== undefined && storeNames[0].trim() !== "") {
-            tableExist = true;
-          }
-        };
+            try {
+              // Handle attempts to create a second table
+              indexedDB.open("app");
+              request.onsuccess = (event) => {
+                const db = event.target.result;
+                const storeNames = db.objectStoreNames;
+                if (
+                  storeNames[0] !== undefined &&
+                  storeNames[0].trim() !== ""
+                ) {
+                  tableExist = true;
+                }
+              };
 
-        if (!tableExist) {
-          // Create table
-          request.onupgradeneeded = (event) => {
-            const db = event.target.result;
+              if (!tableExist) {
+                // Create table
+                request.onupgradeneeded = (event) => {
+                  const db = event.target.result;
 
-            const store = db.createObjectStore(AST.table, {
-              keyPath: "id",
-            });
+                  const store = db.createObjectStore(AST.table, {
+                    keyPath: "id",
+                  });
 
-            store.add({ metadata: AST.columns, id: 0 });
+                  store.add({ metadata: AST.columns, id: 0 });
+                };
+              } else {
+                reject(
+                  new Error(
+                    `${ERROR_TYPES.TABLE_EXISTS} old table: ${storeNames[0]}, new table: ${AST.table}.`,
+                  ),
+                );
+              }
+            } catch (err) {
+              reject(new Error(ERROR_TYPES.FAILED_DB + err.message));
+            }
 
-            console.log(AST.table + " was created successfully!");
-          };
-        } else {
-          const error = `${ERROR_TYPES.TABLE_EXISTS} old table: ${storeNames[0]}, new table: ${AST.table}.`;
-          errors.push(error);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+        }
+
+        try {
+          await createTable();
+        } catch (error) {
+          errors.push(err.message);
         }
 
         if (errors.length === 0) {
@@ -1210,6 +1225,11 @@ export async function executor(VALUE) {
         errors.push(ERROR_TYPES.MISSING_CRUD_OPERATION);
         break;
     }
+  } else {
+    res.table = AST.table;
+    res.action = "error";
+    res.success = false;
+    res.errors = errors;
   }
 
   console.log("ERRORS: ", errors);
