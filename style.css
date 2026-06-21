@@ -3,6 +3,7 @@
   --clr-2: #787878;
   --clr-3: #313025;
   --white: #eaeaea;
+  --error: #c09292;
   --trans-clr-1: rgba(192, 188, 146, 0.3);
 }
 
@@ -126,6 +127,21 @@ tr:nth-child(even) {
 #parent .success {
   font-size: 1.2rem;
   text-transform: capitalize;
-  margin-top: 40px;
   font-family: sans-serif;
+  color: var(--white);
+  background-color: rgb(192 188 146 / 35%);
+  border: 1px solid var(--clr-1);
+  border-left: 5px solid var(--clr-1);
+  padding: 20px;
+}
+
+#parent .error {
+  font-size: 1.2rem;
+  text-transform: capitalize;
+  font-family: sans-serif;
+  color: var(--white);
+  background-color: rgb(192 146 146 / 35%);
+  border: 1px solid var(--error);
+  border-left: 5px solid var(--error);
+  padding: 20px;
 }
