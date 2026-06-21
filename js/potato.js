@@ -768,7 +768,7 @@ function parser(VALUE) {
         datatypes.forEach((type, i) => {
           typesInfo += `${type.value} at position ${type.position}${DATATYPES_LENGTH == i + 1 ? "." : ","}`;
         });
-        const error = `${ERROR_TYPES.DATATYPES_NOT_ALLOWED} ${typesonupgradeneededInfo}`;
+        const error = `${ERROR_TYPES.DATATYPES_NOT_ALLOWED} ${typesInfo}`;
         errors.push(error);
       }
 
@@ -1002,16 +1002,23 @@ export async function executor(VALUE) {
 
             dbRequest.onsuccess = function (event) {
               const db = event.target.result;
-              const tx = db.transaction(AST.table, "readwrite");
+              let tx;
+              try {
+                tx = db.transaction(AST.table, "readwrite");
+
+                // Handle transaction-level errors (silent erros)
+                tx.onerror = () =>
+                  reject(new Error(ERROR_TYPES.TRANSACTION_ERROR + tx.error));
+                tx.onabort = () =>
+                  reject(new Error(ERROR_TYPES.TRANSACTION_ABORTED));
+              } catch (error) {
+                reject(new Error(ERROR_TYPES.TABLE_NOT_EXIST + AST.table));
+                return;
+              }
+
               const store = tx.objectStore(AST.table);
 
               const getMetadata = store.get(0);
-
-              // Handle transaction-level errors (silent erros)
-              tx.onerror = () =>
-                reject(ERROR_TYPES.TRANSACTION_ERROR + tx.error);
-              tx.onabort = () =>
-                reject(new Error(ERROR_TYPES.TRANSACTION_ABORTED));
 
               let metadata = null;
 
@@ -1052,9 +1059,15 @@ export async function executor(VALUE) {
                       if (mdata.datatype === "INT") {
                         cols.push({ name: d.name, value: parseInt(d.value) });
                       } else if (mdata.datatype === "FLT") {
-                        cols.push({ name: d.name, value: parseFloat(d.value) });
+                        cols.push({
+                          name: d.name,
+                          value: parseFloat(d.value),
+                        });
                       } else if (mdata.datatype === "BOOL") {
-                        cols.push({ name: d.name, value: d.value === "true" });
+                        cols.push({
+                          name: d.name,
+                          value: d.value === "true",
+                        });
                       } else if (mdata.datatype === "STR") {
                         cols.push({ name: d.name, value: d.value });
                       } else {
@@ -1081,7 +1094,6 @@ export async function executor(VALUE) {
 
               cursorRequest.onerror = () => reject(cursorRequest.error);
             };
-
             dbRequest.onerror = () => reject(dbRequest.error);
           });
         }
