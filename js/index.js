@@ -26,99 +26,108 @@ BTN.addEventListener("click", async () => {
     console.log("Data is null");
     return;
   }
+  if (res.success) {
+    switch (res.action) {
+      case "LET": {
+        const span = createEle("span");
+        span.innerText = res.msg;
+        addClass(span, "success");
+        PARENT.appendChild(span);
 
-  switch (res.action) {
-    case "LET": {
+        const TABLE = createEle("table");
+        PARENT.appendChild(TABLE);
+
+        const TH_TR = createEle("tr");
+        TABLE.appendChild(TH_TR);
+
+        const TABLE_NAME = createEle("th");
+        TABLE_NAME.innerText = "Field";
+        TH_TR.appendChild(TABLE_NAME);
+
+        let fields = [];
+        let datatypes = [];
+
+        res?.data?.forEach((col) => {
+          const TH = createEle("th");
+          TH.innerText = col.name;
+          fields.push(TH);
+
+          const TD = createEle("td");
+          TD.innerText = col.datatype;
+          datatypes.push(TD);
+        });
+
+        fields.forEach((field) => {
+          TH_TR.appendChild(field);
+        });
+
+        const TD_TR = createEle("tr");
+        TABLE.appendChild(TD_TR);
+        const DATATYPE_TD = createEle("td");
+        DATATYPE_TD.innerText = "Datatype";
+        TD_TR.appendChild(DATATYPE_TD);
+
+        datatypes.forEach((type) => {
+          TD_TR.appendChild(type);
+        });
+        break;
+      }
+
+      case "POST": {
+        const span = createEle("span");
+        span.innerText = res.msg;
+        addClass(span, "success");
+        PARENT.appendChild(span);
+
+        const TABLE = createEle("table");
+        PARENT.appendChild(TABLE);
+
+        const TH_TR = createEle("tr");
+        TABLE.appendChild(TH_TR);
+
+        const TB_TR = createEle("tr");
+        TABLE.appendChild(TB_TR);
+
+        const DATA = res?.data;
+
+        DATA.forEach((d) => {
+          const TD = createEle("th");
+          TD.innerText = d.name;
+          TH_TR.appendChild(TD);
+        });
+
+        DATA.forEach((d) => {
+          const TD = createEle("td");
+          TD.innerText = d.value;
+          TB_TR.appendChild(TD);
+        });
+
+        break;
+      }
+
+      case "DROP": {
+        const span = createEle("span");
+        span.innerText = res.msg;
+        addClass(span, "success");
+        PARENT.appendChild(span);
+        break;
+      }
+
+      case "GET": {
+        console.log("GET is working!");
+        break;
+      }
+
+      default:
+        console.log("Data is null");
+        break;
+    }
+  } else {
+    res.errors.forEach((err) => {
       const span = createEle("span");
-      span.innerText = res.msg;
-      addClass(span, "success");
+      span.innerText = err;
+      addClass(span, "error");
       PARENT.appendChild(span);
-
-      const TABLE = createEle("table");
-      PARENT.appendChild(TABLE);
-
-      const TH_TR = createEle("tr");
-      TABLE.appendChild(TH_TR);
-
-      const TABLE_NAME = createEle("th");
-      TABLE_NAME.innerText = res.table;
-      TH_TR.appendChild(TABLE_NAME);
-
-      let fields = [];
-      let datatypes = [];
-
-      res?.data?.forEach((col) => {
-        const TH = createEle("th");
-        TH.innerText = col.name;
-        fields.push(TH);
-
-        const TD = createEle("td");
-        TD.innerText = col.datatype;
-        datatypes.push(TD);
-      });
-
-      fields.forEach((field) => {
-        TH_TR.appendChild(field);
-      });
-
-      const TD_TR = createEle("tr");
-      TABLE.appendChild(TD_TR);
-      const EMPTY_TD = createEle("td");
-      TD_TR.appendChild(EMPTY_TD);
-
-      datatypes.forEach((type) => {
-        TD_TR.appendChild(type);
-      });
-      break;
-    }
-
-    case "POST": {
-      const span = createEle("span");
-      span.innerText = res.msg;
-      addClass(span, "success");
-      PARENT.appendChild(span);
-
-      const TABLE = createEle("table");
-      PARENT.appendChild(TABLE);
-
-      const TH_TR = createEle("tr");
-      TABLE.appendChild(TH_TR);
-
-      const TB_TR = createEle("tr");
-      TABLE.appendChild(TB_TR);
-
-      const DATA = res?.data;
-
-      DATA.forEach((d) => {
-        const TD = createEle("th");
-        TD.innerText = d.name;
-        TH_TR.appendChild(TD);
-      });
-
-      DATA.forEach((d) => {
-        const TD = createEle("td");
-        TD.innerText = d.value;
-        TB_TR.appendChild(TD);
-      });
-
-      break;
-    }
-
-    case "DROP": {
-      const span = createEle("span");
-      span.innerText = res.msg;
-      addClass(span, "success");
-      PARENT.appendChild(span);
-      break;
-    }
-
-    case "GET": {
-      console.log("GET is working!");
-      break;
-    }
-
-    default:
-      console.log("Data is null");
-      break;
+    });
   }
 });
