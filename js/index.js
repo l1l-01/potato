@@ -114,7 +114,36 @@ BTN.addEventListener("click", async () => {
       }
 
       case "GET": {
-        console.log("GET is working!");
+        const span = createEle("span");
+        span.innerText = res.msg;
+        addClass(span, "success");
+        PARENT.appendChild(span);
+
+        const TABLE = createEle("table");
+        PARENT.appendChild(TABLE);
+
+        const TH_TR = createEle("tr");
+        TABLE.appendChild(TH_TR);
+
+        const DATA = res?.data;
+
+        console.log();
+        DATA[0].data.forEach((d) => {
+          const TD = createEle("th");
+          TD.innerText = d.name;
+          TH_TR.appendChild(TD);
+        });
+
+        DATA.forEach((d) => {
+          console.log(d);
+          const TB_TR = createEle("tr");
+          TABLE.appendChild(TB_TR);
+          d.data.forEach((b) => {
+            const TD = createEle("td");
+            TD.innerText = b.value;
+            TB_TR.appendChild(TD);
+          });
+        });
         break;
       }
 
