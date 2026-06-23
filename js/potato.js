@@ -912,6 +912,7 @@ function parser(VALUE) {
 export async function executor(VALUE) {
   const AST = parser(VALUE);
   let tableExist = false;
+  console.log(AST);
 
   const res = {
     table: null,
@@ -963,7 +964,7 @@ export async function executor(VALUE) {
           res.table = AST.table;
           res.action = AST.action;
           res.success = true;
-          res.msg = `${AST.table} was created successfully:`;
+          res.msg = `${AST.table}' table was created successfully:`;
           res.data = AST.columns;
         } else {
           res.table = AST.table;
@@ -1088,7 +1089,7 @@ export async function executor(VALUE) {
           res.table = AST.table;
           res.action = AST.action;
           res.success = true;
-          res.msg = `Data was stored in ${AST.table} successfully:`;
+          res.msg = `Data was stored in '${AST.table}' successfully:`;
           res.data = AST.columns;
         } else {
           res.table = AST.table;
@@ -1193,6 +1194,7 @@ export async function executor(VALUE) {
         if (AST.all) {
           try {
             data = await getAllData();
+            data = data.slice(1);
           } catch (err) {
             errors.push(err.message);
           }
@@ -1225,7 +1227,6 @@ export async function executor(VALUE) {
   }
 
   console.log("ERRORS: ", errors);
-  console.log("AST", AST);
 
   return res;
 }
