@@ -93,6 +93,7 @@ const ERROR_TYPES = {
     "ERROR(036): Table metadata doesn't match with the data you are trying to POST: ",
   TRANSACTION_ABORTED: "Error(037): Transaction aborted!",
   TRANSACTION_ERROR: "Error(038): Transaction error: ",
+  TABLE_EMPTY: "Error(039): Table ",
 };
 
 let errors = [];
@@ -1191,10 +1192,56 @@ export async function executor(VALUE) {
           });
         }
 
+        async function getDataWhere() {
+          let data;
+          try {
+            data = await getAllData();
+          } catch (err) {
+            errors.push(err.message);
+          }
+          let target = null;
+
+          if (AST.condition?.length == 1) {
+            if (AST.condition[0]?.name == "id") {
+              target = data.filter((d) => {
+                return d.id == AST.condition[0]?.value;
+              });
+              console.log("Target: ", target);
+              console.log("Working");
+            } else {
+              target = [];
+              data.forEach((d, i) => {
+                if (d.data !== undefined) {
+                  let result = null;
+                  d.data.forEach((rw, i) => {
+                    if (
+                      rw.value == AST.condition[0]?.value &&
+                      rw.name == AST.condition[0]?.name
+                    ) {
+                      target.push(d);
+                    }
+                  });
+                }
+              });
+            }
+          }
+
+          return target;
+        }
+
         if (AST.all) {
           try {
             data = await getAllData();
             data = data.slice(1);
+          } catch (err) {
+            errors.push(err.message);
+          }
+        } else {
+          try {
+            data = await getDataWhere();
+            if (data.length == 0) {
+              errors.push(ERROR_TYPES.TABLE_EMPTY + `'${AST.table}' is empty.`);
+            }
           } catch (err) {
             errors.push(err.message);
           }
@@ -1227,6 +1274,6 @@ export async function executor(VALUE) {
   }
 
   console.log("ERRORS: ", errors);
-
+  errors = [];
   return res;
 }
