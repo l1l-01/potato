@@ -125,19 +125,26 @@ BTN.addEventListener("click", async () => {
         const TH_TR = createEle("tr");
         TABLE.appendChild(TH_TR);
 
-        const DATA = res?.data;
+        const ID = createEle("th");
+        ID.innerText = "Id";
+        TH_TR.appendChild(ID);
 
-        console.log();
+        const DATA = res?.data;
         DATA[0].data.forEach((d) => {
-          const TD = createEle("th");
-          TD.innerText = d.name;
-          TH_TR.appendChild(TD);
+          const TH = createEle("th");
+          TH.innerText = d.name;
+          TH_TR.appendChild(TH);
         });
 
         DATA.forEach((d) => {
           console.log(d);
           const TB_TR = createEle("tr");
           TABLE.appendChild(TB_TR);
+
+          const ID = createEle("td");
+          ID.innerText = d.id;
+          TB_TR.appendChild(ID);
+
           d.data.forEach((b) => {
             const TD = createEle("td");
             TD.innerText = b.value;
