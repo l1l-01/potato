@@ -56,13 +56,13 @@ how programming and query languages are designed and implemented.
 | Errors                                                                                                       |
 | ------------------------------------------------------------------------------------------------------------ |
 | ERROR(000): Your query is empty.                                                                             |
-| ERROR(001): UNKNOWN KEYWORD...                                                                               |
+| ERROR(001): Unknown Keyword...                                                                               |
 | Error(002): Missing CRUD keyword. An action must be specified. Use one of: LET, POST, GET, UPD, DLT.         |
 | Error(003): Only one CRUD operation can run at a time. You are trying to use more than one:...               |
 | ERROR(004): Misplaced CRUD keyword:...                                                                       |
 | ERROR(005): You can only perform one CRUD operation on a single table at a time:...                          |
 | ERROR(006): Your query is missing a table name.                                                              |
-| MISPLACED_TABLE_NAME: ERROR(007): Misplaced table name:...                                                   |
+| ERROR(007): Misplaced table name:...                                                                         |
 | ERROR(008): Missing operation. Please use one of: LET, GET, UPD, DLT, DROP.                                  |
 | ERROR(009): ID is created automatically, remove the provided id:...                                          |
 | ERROR(010): Limit can only be used in a GET query:...                                                        |
