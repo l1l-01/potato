@@ -13,9 +13,9 @@ how programming and query languages are designed and implemented.
 
 > **Note:** You need to refresh the page after each query.
 
-![img](./1.png)
-![img](./3.png)
-![img](./2.png)
+![img](./img/1.png)
+![img](./img/2.png)
+![img](./img/3.png)
 
 - What works has a status of 1, and 0 is not working
 
