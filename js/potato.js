@@ -1201,13 +1201,12 @@ export async function executor(VALUE) {
           }
           let target = null;
 
+          // Handle one condition
           if (AST.condition?.length == 1) {
             if (AST.condition[0]?.name == "id") {
               target = data.filter((d) => {
                 return d.id == AST.condition[0]?.value;
               });
-              console.log("Target: ", target);
-              console.log("Working");
             } else {
               target = [];
               data.forEach((d, i) => {
@@ -1259,6 +1258,82 @@ export async function executor(VALUE) {
           res.success = false;
           res.errors = errors;
         }
+        break;
+      }
+
+      case "DLT": {
+        if (AST.all) {
+          function deleteAll() {
+            return new Promise((resolve, reject) => {
+              const request = indexedDB.open("app", Date.now());
+
+              request.onerror = () => reject(request.error);
+
+              request.onsuccess = (event) => {
+                const db = event.target.result;
+                try {
+                  const transaction = db.transaction(AST.table, "readwrite");
+                  const store = transaction.objectStore(AST.table);
+                  const cursorRequest = store.openCursor();
+                  cursorRequest.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    if (cursor) {
+                      if (cursor.key !== 0) {
+                        cursor.delete();
+                      }
+                      cursor.continue();
+                    }
+                  };
+
+                  cursorRequest.onerror = () => {
+                    db.close();
+                    reject(cursorRequest.error);
+                  };
+
+                  transaction.oncomplete = () => {
+                    res.msg = `'${AST.table}' table rows were deleted successfully!`;
+                    res.all = true;
+                    db.close();
+                    resolve(true);
+                  };
+
+                  transaction.onerror = () => {
+                    db.close();
+                    reject(transaction.error);
+                  };
+
+                  transaction.onabort = () => {
+                    db.close();
+                    reject(transaction.error);
+                  };
+                } catch (err) {
+                  db.close();
+                  reject(new Error(ERROR_TYPES.FAILED_DB + err.message));
+                }
+              };
+            });
+          }
+
+          try {
+            await deleteAll();
+          } catch (err) {
+            errors.push(err.message);
+          }
+        } else {
+          res.msg = `Row in '${AST.table}' Table was deleted successfully!`;
+        }
+
+        if (errors.length === 0) {
+          res.table = AST.table;
+          res.action = AST.action;
+          res.success = true;
+        } else {
+          res.table = AST.table;
+          res.action = "error";
+          res.success = false;
+          res.errors = errors;
+        }
+
         break;
       }
 
