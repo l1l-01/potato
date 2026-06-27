@@ -5,6 +5,7 @@
   --white: #eaeaea;
   --error: #c09292;
   --trans-clr-1: rgba(192, 188, 146, 0.3);
+  --trans-clr-2: rgba(192, 188, 146, 0.1);
 }
 
 *,
@@ -117,11 +118,11 @@ th {
 
 tr th {
   background-color: var(--white);
-  color: #2f246e;
+  color: var(--clr-3);
 }
 
 tr:nth-child(even) {
-  background-color: var(--trans-clr-1);
+  background-color: var(--trans-clr-2);
 }
 
 #parent .success {
